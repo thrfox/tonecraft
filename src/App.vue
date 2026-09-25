@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { audioContext, detectPitch, midiToFrequency, playInstrument, playMetronome } from './audio'
 
 const tabs = [
@@ -8,10 +8,23 @@ const tabs = [
   { id: 'metronome', label: '节拍器', icon: '◉', number: '03' },
   { id: 'tuner', label: '调音器', icon: '◌', number: '04' },
 ]
-const activeTab = ref('piano')
-const showLabels = ref(true)
-const showHints = ref(true)
 const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
+const storageKey = 'tonecraft.settings.v2'
+function readSettings() {
+  try { return JSON.parse(localStorage.getItem(storageKey) || '{}') || {} }
+  catch { return {} }
+}
+const saved = readSettings()
+const validNotes = value => Array.isArray(value) ? value.filter(note => noteNames.includes(note)) : []
+const activeTab = ref(tabs.some(tab => tab.id === saved.activeTab) ? saved.activeTab : 'piano')
+const pianoVisibleNotes = ref(validNotes(saved.pianoVisibleNotes))
+const guitarVisibleNotes = ref(validNotes(saved.guitarVisibleNotes))
+const pianoHints = ref(saved.pianoHints !== false)
+const guitarHints = ref(saved.guitarHints !== false)
+function toggleNote(instrument, note) {
+  const list = instrument === 'piano' ? pianoVisibleNotes : guitarVisibleNotes
+  list.value = list.value.includes(note) ? list.value.filter(item => item !== note) : [...list.value, note]
+}
 const keyboardMap = { A: 48, W: 49, S: 50, E: 51, D: 52, F: 53, T: 54, G: 55, Y: 56, H: 57, U: 58, J: 59, K: 60, O: 61, L: 62, P: 63, ';': 64, "'": 65, '[': 66, ']': 68 }
 const hintForMidi = midi => Object.keys(keyboardMap).find(key => keyboardMap[key] === midi) || ''
 const isBlack = (midi) => [1, 3, 6, 8, 10].includes(midi % 12)
@@ -60,10 +73,10 @@ function playFret(stringIndex, fret) {
   playNote(midi, 'guitar')
 }
 
-const bpm = ref(100)
-const beatsPerBar = ref(4)
-const beatUnit = ref(4)
-const voice = ref('classic')
+const bpm = ref(Number.isFinite(Number(saved.bpm)) ? Math.min(400, Math.max(20, Math.round(Number(saved.bpm)))) : 100)
+const beatsPerBar = ref(Number.isInteger(saved.beatsPerBar) && saved.beatsPerBar >= 1 && saved.beatsPerBar <= 12 ? saved.beatsPerBar : 4)
+const beatUnit = ref([2, 4, 8, 16].includes(saved.beatUnit) ? saved.beatUnit : 4)
+const voice = ref(['classic', 'wood', 'bell', 'digital', 'soft'].includes(saved.voice) ? saved.voice : 'classic')
 const voices = [
   { value: 'classic', name: '经典', icon: '◉' },
   { value: 'wood', name: '木鱼', icon: '▣' },
@@ -71,7 +84,8 @@ const voices = [
   { value: 'digital', name: '电子', icon: '▦' },
   { value: 'soft', name: '柔和', icon: '◌' },
 ]
-const accents = ref([3, 1, 1, 1])
+const accents = ref(Array.isArray(saved.accents) && saved.accents.length === beatsPerBar.value && saved.accents.every(value => Number.isInteger(value) && value >= 0 && value <= 3)
+  ? [...saved.accents] : Array.from({ length: beatsPerBar.value }, (_, i) => i === 0 ? 3 : 1))
 const running = ref(false)
 const visibleBeat = ref(-1)
 const tapTimes = []
@@ -129,17 +143,40 @@ function tapTempo() {
 }
 watch(beatsPerBar, setMeter)
 watch(beatUnit, () => { if (running.value) { stopMetronome(); toggleMetronome() } })
+watch([activeTab, pianoVisibleNotes, guitarVisibleNotes, pianoHints, guitarHints, bpm, beatsPerBar, beatUnit, voice, accents], () => {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify({
+      activeTab: activeTab.value,
+      pianoVisibleNotes: pianoVisibleNotes.value,
+      guitarVisibleNotes: guitarVisibleNotes.value,
+      pianoHints: pianoHints.value,
+      guitarHints: guitarHints.value,
+      bpm: bpm.value,
+      beatsPerBar: beatsPerBar.value,
+      beatUnit: beatUnit.value,
+      voice: voice.value,
+      accents: accents.value,
+    }))
+  } catch { /* Storage may be unavailable in private browsing. */ }
+}, { deep: true })
 
 const listening = ref(false)
+const requestingMic = ref(false)
 const tunerError = ref('')
 const detectedFrequency = ref(null)
 const cents = ref(0)
 const detectedMidi = ref(null)
+const waveformCanvas = ref(null)
+const pitchCanvas = ref(null)
+const pitchHistory = []
+const pitchHistoryMs = 12000
 const tunerNotes = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 const nearestNote = computed(() => detectedMidi.value === null ? '—' : tunerNotes[detectedMidi.value % 12])
 const nearestOctave = computed(() => detectedMidi.value === null ? '' : Math.floor(detectedMidi.value / 12) - 1)
 const tunerStatus = computed(() => {
-  if (!listening.value) return '开启麦克风开始调音'
+  if (requestingMic.value) return '正在请求麦克风权限…'
+  if (tunerError.value) return '麦克风暂不可用'
+  if (!listening.value) return '进入调音器后自动开始聆听'
   if (detectedFrequency.value === null) return '请拨动琴弦或弹奏一个音'
   if (Math.abs(cents.value) <= 5) return '音准到位，很棒！'
   return cents.value < 0 ? '音调偏低，稍微调高' : '音调偏高，稍微调低'
@@ -149,21 +186,98 @@ let analyser
 let tunerSource
 let tunerFrame
 let previousPitch = null
+let lastDetectedAt = 0
+let tunerRequestId = 0
+function canvasContext(canvas) {
+  if (!canvas) return null
+  const width = Math.max(1, canvas.clientWidth)
+  const height = Math.max(1, canvas.clientHeight)
+  const ratio = window.devicePixelRatio || 1
+  if (canvas.width !== Math.round(width * ratio) || canvas.height !== Math.round(height * ratio)) {
+    canvas.width = Math.round(width * ratio)
+    canvas.height = Math.round(height * ratio)
+  }
+  const context = canvas.getContext('2d')
+  context.setTransform(ratio, 0, 0, ratio, 0, 0)
+  context.clearRect(0, 0, width, height)
+  return { context, width, height }
+}
+function drawWaveform(buffer) {
+  const surface = canvasContext(waveformCanvas.value)
+  if (!surface) return
+  const { context, width, height } = surface
+  context.strokeStyle = '#d8e7dc'
+  context.lineWidth = 1
+  context.beginPath()
+  context.moveTo(0, height / 2)
+  context.lineTo(width, height / 2)
+  context.stroke()
+  context.strokeStyle = '#5ca779'
+  context.lineWidth = 2
+  context.beginPath()
+  const stride = Math.max(1, Math.floor(buffer.length / width))
+  for (let x = 0; x < width; x++) {
+    const sample = buffer[Math.min(buffer.length - 1, x * stride)] || 0
+    const y = height / 2 - Math.max(-1, Math.min(1, sample * 2.6)) * (height / 2 - 7)
+    if (x === 0) context.moveTo(x, y)
+    else context.lineTo(x, y)
+  }
+  context.stroke()
+}
+function drawPitchHistory(now) {
+  const surface = canvasContext(pitchCanvas.value)
+  if (!surface) return
+  const { context, width, height } = surface
+  for (const value of [-50, -25, 0, 25, 50]) {
+    const y = height / 2 - value / 60 * (height / 2 - 12)
+    context.strokeStyle = value === 0 ? '#a9d0b4' : '#e4eee6'
+    context.lineWidth = value === 0 ? 1.5 : 1
+    context.beginPath()
+    context.moveTo(0, y)
+    context.lineTo(width, y)
+    context.stroke()
+  }
+  context.strokeStyle = '#3c9061'
+  context.lineWidth = 2.5
+  context.lineJoin = 'round'
+  context.beginPath()
+  let drawing = false
+  for (const point of pitchHistory) {
+    if (point.cents === null) { drawing = false; continue }
+    const x = width - (now - point.time) / pitchHistoryMs * width
+    const y = height / 2 - Math.max(-50, Math.min(50, point.cents)) / 60 * (height / 2 - 12)
+    if (!drawing) context.moveTo(x, y)
+    else context.lineTo(x, y)
+    drawing = true
+  }
+  context.stroke()
+}
 async function startTuner() {
+  if (listening.value || requestingMic.value || activeTab.value !== 'tuner') return
   tunerError.value = ''
   if (!navigator.mediaDevices?.getUserMedia) {
     tunerError.value = '当前环境无法访问麦克风。请使用 HTTPS 或 localhost 打开页面。'
     return
   }
+  const requestId = ++tunerRequestId
+  requestingMic.value = true
   try {
     const ctx = audioContext()
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+    const acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } })
+    if (requestId !== tunerRequestId || activeTab.value !== 'tuner') {
+      acquiredStream.getTracks().forEach(track => track.stop())
+      return
+    }
+    stream = acquiredStream
+    ctx.resume().catch(() => {})
     tunerSource = ctx.createMediaStreamSource(stream)
     analyser = ctx.createAnalyser()
     analyser.fftSize = 4096
     analyser.smoothingTimeConstant = 0
     tunerSource.connect(analyser)
     listening.value = true
+    requestingMic.value = false
+    pitchHistory.length = 0
     const buffer = new Float32Array(analyser.fftSize)
     let lastAnalysis = 0
     const analyze = (time) => {
@@ -180,24 +294,34 @@ async function startTuner() {
           detectedMidi.value = midi
           detectedFrequency.value = stable
           cents.value = Math.round(1200 * Math.log2(stable / midiToFrequency(midi)))
+          lastDetectedAt = time
         } else {
-          detectedFrequency.value = null
-          detectedMidi.value = null
-          previousPitch = null
+          if (time - lastDetectedAt > 1800) {
+            detectedFrequency.value = null
+            detectedMidi.value = null
+            previousPitch = null
+          }
         }
+        pitchHistory.push({ time, cents: frequency ? cents.value : null })
+        while (pitchHistory.length && time - pitchHistory[0].time > pitchHistoryMs) pitchHistory.shift()
+        drawWaveform(buffer)
+        drawPitchHistory(time)
       }
       tunerFrame = requestAnimationFrame(analyze)
     }
     tunerFrame = requestAnimationFrame(analyze)
   } catch (error) {
+    if (requestId !== tunerRequestId) return
     tunerError.value = error.name === 'NotAllowedError'
-      ? '麦克风权限被拒绝。请在浏览器地址栏中允许麦克风后重试。'
+      ? '麦克风权限被拒绝。请在浏览器地址栏中允许麦克风，再重新进入本页面。'
       : '无法启动麦克风，请检查设备连接和浏览器权限。'
     stopTuner()
   }
 }
 function stopTuner() {
+  tunerRequestId++
   listening.value = false
+  requestingMic.value = false
   cancelAnimationFrame(tunerFrame)
   tunerSource?.disconnect()
   stream?.getTracks().forEach(track => track.stop())
@@ -208,9 +332,14 @@ function stopTuner() {
   detectedMidi.value = null
   previousPitch = null
 }
-function toggleTuner() { listening.value ? stopTuner() : startTuner() }
-watch(activeTab, tab => { if (tab !== 'tuner' && listening.value) stopTuner() })
-onMounted(() => window.addEventListener('keydown', handleKeyboard))
+watch(activeTab, async tab => {
+  if (tab === 'tuner') { await nextTick(); startTuner() }
+  else stopTuner()
+})
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyboard)
+  if (activeTab.value === 'tuner') nextTick(startTuner)
+})
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyboard)
   stopMetronome()
@@ -241,23 +370,50 @@ onBeforeUnmount(() => {
           <div class="card instrument-card">
             <div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 01</div><h2>经典钢琴</h2></div><span class="pill">C3 — C5 · 25 KEYS</span></div>
             <div class="piano-display"><div class="display-pulse">◉</div><div><small>当前音符 / NOW PLAYING</small><strong>{{ currentNote?.name || '—' }}</strong></div><div class="display-frequency">{{ currentNote ? `${currentNote.frequency} Hz` : '点击琴键开始' }}</div></div>
-            <div class="piano-scroll"><div class="piano" role="group" aria-label="钢琴键盘"><button v-for="note in whiteNotes" :key="note.midi" class="white-key" :class="{ active: pressedMidi === note.midi }" :aria-label="`弹奏 ${note.name}${note.octave}`" @pointerdown.prevent="playNote(note.midi)"><span v-if="showLabels" class="key-note">{{ note.name }}{{ note.octave }}</span><span v-if="showHints" class="key-hint">{{ hintForMidi(note.midi) }}</span></button><button v-for="note in blackNotes" :key="note.midi" class="black-key" :class="{ active: pressedMidi === note.midi }" :style="{ left: `calc(${note.afterWhite} * var(--white-width) - var(--black-width) / 2)` }" :aria-label="`弹奏 ${note.name}${note.octave}`" @pointerdown.prevent="playNote(note.midi)"><span v-if="showLabels" class="key-note">{{ note.name }}{{ note.octave }}</span><span v-if="showHints" class="key-hint">{{ hintForMidi(note.midi) }}</span></button></div></div>
-            <div class="instrument-footer"><div class="footer-tip"><span>⌨</span> 点击琴键，或使用电脑键盘弹奏</div><div class="switches"><label class="switch-label">音符标记 <input type="checkbox" v-model="showLabels"><span class="switch"></span></label><label class="switch-label">键盘提示 <input type="checkbox" v-model="showHints"><span class="switch"></span></label></div></div>
+            <div class="piano-scroll"><div class="piano" role="group" aria-label="钢琴键盘"><button v-for="note in whiteNotes" :key="note.midi" class="white-key" :class="{ active: pressedMidi === note.midi }" :aria-label="`弹奏 ${note.name}${note.octave}`" @pointerdown.prevent="playNote(note.midi)"><span v-if="pianoVisibleNotes.includes(note.name)" class="key-note">{{ note.name }}{{ note.octave }}</span><span v-if="pianoHints" class="key-hint">{{ hintForMidi(note.midi) }}</span></button><button v-for="note in blackNotes" :key="note.midi" class="black-key" :class="{ active: pressedMidi === note.midi }" :style="{ left: `calc(${note.afterWhite} * var(--white-width) - var(--black-width) / 2)` }" :aria-label="`弹奏 ${note.name}${note.octave}`" @pointerdown.prevent="playNote(note.midi)"><span v-if="pianoVisibleNotes.includes(note.name)" class="key-note">{{ note.name }}{{ note.octave }}</span><span v-if="pianoHints" class="key-hint">{{ hintForMidi(note.midi) }}</span></button></div></div>
+            <div class="note-picker" aria-label="钢琴音符标记">
+              <div class="note-picker-heading"><span>音符标记 <small>点选需要显示的音名</small></span><div><button @click="pianoVisibleNotes = [...noteNames]">全选</button><button @click="pianoVisibleNotes = []">清空</button></div></div>
+              <div class="note-chips"><button v-for="name in noteNames" :key="name" :class="{ selected: pianoVisibleNotes.includes(name) }" :aria-pressed="pianoVisibleNotes.includes(name)" @click="toggleNote('piano', name)">{{ name }}</button></div>
+            </div>
+            <div class="instrument-footer"><div class="footer-tip"><span>⌨</span> 点击琴键，或使用电脑键盘弹奏</div><div class="switches"><label class="switch-label">键盘提示 <input type="checkbox" v-model="pianoHints"><span class="switch"></span></label></div></div>
           </div>
           <div class="info-grid"><div class="info-card"><span class="info-icon">♫</span><div><small>音域范围</small><strong>C3 — C5</strong></div></div><div class="info-card"><span class="info-icon">◉</span><div><small>上次弹奏</small><strong>{{ currentNote?.name || '等待演奏' }}</strong></div></div><div class="info-card"><span class="info-icon">▦</span><div><small>累计弹奏</small><strong>{{ playedCount }} <em>次</em></strong></div></div></div>
         </section>
 
         <section v-if="activeTab === 'guitar'" class="workspace">
           <div class="card instrument-card guitar-card"><div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 02</div><h2>六弦吉他</h2></div><span class="pill">STANDARD TUNING · E A D G B e</span></div>
-            <div class="guitar-topline"><div><span class="mini-dot"></span> 标准调弦 · 12 品指板</div><div class="guitar-toggles"><label class="switch-label">音符标记 <input type="checkbox" v-model="showLabels"><span class="switch"></span></label><label class="switch-label">音调提示 <input type="checkbox" v-model="showHints"><span class="switch"></span></label></div></div>
-            <div class="fretboard-scroll"><div class="fretboard"><div v-for="(string, s) in guitarStrings" :key="string.name + s" class="string-row"><div class="string-name">{{ string.name }}</div><button v-for="fret in frets" :key="fret" class="fret" :class="{ 'fret-open': fret === 0, 'fret-selected': selectedFret === `${s}-${fret}` }" :aria-label="`第${s + 1}弦第${fret}品 ${noteLabel(string.midi + fret)}`" @pointerdown.prevent="playFret(s, fret)"><span class="string-line" :style="{ height: `${string.gauge * 0.5 + 0.5}px` }"></span><span v-if="showLabels" class="fret-label">{{ noteNames[(string.midi + fret) % 12] }}</span></button></div><div class="fret-numbers"><span></span><span v-for="fret in frets" :key="fret">{{ fret === 0 ? '空弦' : fret }}</span></div><div class="fret-markers"><span></span><span v-for="fret in frets" :key="fret" :class="{ marked: [3,5,7,9,12].includes(fret) }">{{ [3,5,7,9].includes(fret) ? '●' : fret === 12 ? '● ●' : '' }}</span></div></div></div>
-            <div class="guitar-footer"><div class="footer-tip"><span>✦</span> 点击琴格弹奏 · 从上至下为第 1 至第 6 弦</div><div v-if="showHints" class="guitar-current">{{ currentNote ? `${currentNote.name} · ${currentNote.frequency} Hz` : '选择一个琴格试听音高' }}</div></div>
+            <div class="guitar-topline"><div><span class="mini-dot"></span> 标准调弦 · 12 品指板</div><div class="guitar-toggles"><label class="switch-label">音调提示 <input type="checkbox" v-model="guitarHints"><span class="switch"></span></label></div></div>
+            <div class="note-picker guitar-note-picker" aria-label="吉他音符标记">
+              <div class="note-picker-heading"><span>音符标记 <small>点选需要显示的音名</small></span><div><button @click="guitarVisibleNotes = [...noteNames]">全选</button><button @click="guitarVisibleNotes = []">清空</button></div></div>
+              <div class="note-chips"><button v-for="name in noteNames" :key="name" :class="{ selected: guitarVisibleNotes.includes(name) }" :aria-pressed="guitarVisibleNotes.includes(name)" @click="toggleNote('guitar', name)">{{ name }}</button></div>
+            </div>
+            <div class="fretboard-scroll"><div class="fretboard"><div v-for="(string, s) in guitarStrings" :key="string.name + s" class="string-row"><div class="string-name">{{ string.name }}</div><button v-for="fret in frets" :key="fret" class="fret" :class="{ 'fret-open': fret === 0, 'fret-selected': selectedFret === `${s}-${fret}` }" :aria-label="`第${s + 1}弦第${fret}品 ${noteLabel(string.midi + fret)}`" @pointerdown.prevent="playFret(s, fret)"><span class="string-line" :style="{ height: `${string.gauge * 0.5 + 0.5}px` }"></span><span v-if="guitarVisibleNotes.includes(noteNames[(string.midi + fret) % 12])" class="fret-label">{{ noteNames[(string.midi + fret) % 12] }}</span></button></div><div class="fret-numbers"><span></span><span v-for="fret in frets" :key="fret">{{ fret === 0 ? '空弦' : fret }}</span></div><div class="fret-markers"><span></span><span v-for="fret in frets" :key="fret" :class="{ marked: [3,5,7,9,12].includes(fret) }">{{ [3,5,7,9].includes(fret) ? '●' : fret === 12 ? '● ●' : '' }}</span></div></div></div>
+            <div class="guitar-footer"><div class="footer-tip"><span>✦</span> 点击琴格弹奏 · 从上至下为第 1 至第 6 弦</div><div v-if="guitarHints" class="guitar-current">{{ currentNote ? `${currentNote.name} · ${currentNote.frequency} Hz` : '选择一个琴格试听音高' }}</div></div>
           </div><div class="info-grid"><div class="info-card"><span class="info-icon">♮</span><div><small>调弦方式</small><strong>标准调弦</strong></div></div><div class="info-card"><span class="info-icon">◎</span><div><small>当前音符</small><strong>{{ currentNote?.name || '—' }}</strong></div></div><div class="info-card"><span class="info-icon">▤</span><div><small>指板范围</small><strong>0 — 12 <em>品</em></strong></div></div></div>
         </section>
 
         <section v-if="activeTab === 'metronome'" class="workspace metronome-layout"><div class="card metro-card"><div class="card-title-row"><div><div class="section-kicker">RHYTHM LAB</div><h2>节奏控制台</h2></div><span class="pill">20 — 400 BPM</span></div><div class="bpm-panel"><div class="bpm-label">每分钟节拍 / BEATS PER MINUTE</div><div class="bpm-control"><button aria-label="减少 BPM" @click="changeBpm(bpm - 1)">−</button><input type="number" min="20" max="400" :value="bpm" aria-label="BPM" @change="changeBpm($event.target.value)"><button aria-label="增加 BPM" @click="changeBpm(bpm + 1)">+</button></div><div class="bpm-unit">BPM</div><input class="bpm-slider" type="range" min="20" max="400" :value="bpm" aria-label="调整 BPM" @input="changeBpm($event.target.value)"><div class="range-labels"><span>20</span><span>慢速</span><span>中速</span><span>快速</span><span>400</span></div></div><div class="meter-controls"><div><label class="field-label">拍号 / TIME SIGNATURE</label><div class="meter-selects"><select v-model.number="beatsPerBar" aria-label="每小节拍数"><option v-for="n in 12" :key="n" :value="n">{{ n }}</option></select><span>/</span><select v-model.number="beatUnit" aria-label="拍号分母"><option v-for="n in [2,4,8,16]" :key="n" :value="n">{{ n }}</option></select></div></div><div><label class="field-label">间隔 / INTERVAL</label><div class="interval-readout">{{ Math.round(intervalMs) }} <span>毫秒</span></div></div></div><div class="beat-section"><div class="field-label">每拍强度 <span>点击循环：强 · 中 · 弱 · 静音</span></div><div class="beat-grid"><button v-for="(accent, index) in accents" :key="index" class="beat-button" :class="[`accent-${accent}`, { current: visibleBeat === index }]" :aria-label="`第${index + 1}拍，强度${accent}`" @click="cycleAccent(index)"><span class="beat-indicator"></span><strong>{{ String(index + 1).padStart(2, '0') }}</strong><small>{{ ['静音','弱','中','强'][accent] }}</small></button></div></div><div class="metro-actions"><button class="primary-button" @click="toggleMetronome"><span>{{ running ? '■' : '▶' }}</span>{{ running ? '停止节拍' : '开始节拍' }}</button><button class="secondary-button" @click="tapTempo">TAP 节奏</button></div></div><div class="card voice-card"><div class="section-kicker">SOUND PALETTE</div><h2>选择音色</h2><p>为节拍选择喜欢的声音。</p><div class="voice-list"><button v-for="item in voices" :key="item.value" class="voice-option" :class="{ selected: voice === item.value }" @click="voice = item.value; playMetronome(audioContext().currentTime + 0.01, item.value, 2)"><span class="voice-icon">{{ item.icon }}</span><span>{{ item.name }}</span><span class="voice-radio"></span></button></div><div class="voice-hint">♫ 选择音色时可即时试听</div></div></section>
 
-        <section v-if="activeTab === 'tuner'" class="workspace tuner-layout"><div class="card tuner-card"><div class="card-title-row"><div><div class="section-kicker">PITCH DETECTION</div><h2>实时音高检测</h2></div><span class="pill" :class="{ live: listening }"><span class="mini-dot"></span>{{ listening ? '正在聆听' : '等待输入' }}</span></div><div class="tuner-main"><div class="tuner-arc"><div class="tuner-ticks"><span v-for="n in 21" :key="n" :class="{ major: n === 1 || n === 6 || n === 11 || n === 16 || n === 21 }"></span></div><div class="tuner-needle-track"><span class="tuner-needle" :style="{ left: `${50 + Math.max(-50, Math.min(50, cents))}%` }"></span></div><div class="tuner-scale"><span>−50</span><span>−25</span><span>0</span><span>+25</span><span>+50</span></div></div><div class="detected-note"><small>检测到的音符 / DETECTED NOTE</small><div>{{ nearestNote }}<span>{{ nearestOctave }}</span></div><strong>{{ detectedFrequency ? `${detectedFrequency.toFixed(1)} Hz` : '— Hz' }}</strong></div><div class="tuner-message" :class="{ inTune: listening && detectedFrequency && Math.abs(cents) <= 5 }"><span>{{ listening && detectedFrequency ? (Math.abs(cents) <= 5 ? '✓' : cents < 0 ? '↗' : '↘') : '◌' }}</span>{{ tunerStatus }}</div><button class="primary-button tuner-button" @click="toggleTuner"><span>{{ listening ? '■' : '◉' }}</span>{{ listening ? '停止调音' : '开启麦克风' }}</button><p v-if="tunerError" class="error-message" role="alert">{{ tunerError }}</p><p class="privacy-note">仅在本机分析音频，不会上传录音。</p></div></div><div class="tuner-side"><div class="card tuning-reference"><div class="section-kicker">QUICK REFERENCE</div><h2>吉他标准调弦</h2><div v-for="(string, index) in guitarStrings" :key="index" class="reference-row"><span>第 {{ index + 1 }} 弦</span><strong>{{ string.name }}{{ Math.floor(string.midi / 12) - 1 }}</strong><small>{{ Math.round(midiToFrequency(string.midi)) }} Hz</small></div></div><div class="tuner-tip"><span>✦</span><div><strong>调音小贴士</strong><p>在安静的环境下，逐根拨动琴弦并等待指针稳定。指针位于中央时最接近标准音高。</p></div></div></div></section>
+        <section v-if="activeTab === 'tuner'" class="workspace tuner-layout">
+          <div class="card tuner-card">
+            <div class="card-title-row"><div><div class="section-kicker">PITCH DETECTION</div><h2>实时音高检测</h2></div><span class="pill" :class="{ live: listening }"><span class="mini-dot"></span>{{ requestingMic ? '请求权限中' : listening ? '正在聆听' : '等待输入' }}</span></div>
+            <div class="tuner-main">
+              <div class="tuner-chart-group">
+                <div class="chart-heading"><span>输入波形 / LIVE WAVEFORM</span><span class="chart-live">● LIVE</span></div>
+                <canvas ref="waveformCanvas" class="tuner-waveform" role="img" aria-label="实时麦克风波形"></canvas>
+                <div class="chart-heading pitch-heading"><span>音高轨迹 / PITCH HISTORY</span><span>最近 12 秒 · 音分偏差</span></div>
+                <canvas ref="pitchCanvas" class="tuner-pitch-chart" role="img" aria-label="最近 12 秒的实时音高偏差轨迹"></canvas>
+                <div class="chart-axis"><span>−12 秒</span><span>当前</span></div>
+              </div>
+              <div class="tuner-arc"><div class="tuner-ticks"><span v-for="n in 21" :key="n" :class="{ major: n === 1 || n === 6 || n === 11 || n === 16 || n === 21 }"></span></div><div class="tuner-needle-track"><span class="tuner-needle" :style="{ left: `${50 + Math.max(-50, Math.min(50, cents))}%` }"></span></div><div class="tuner-scale"><span>−50</span><span>−25</span><span>0</span><span>+25</span><span>+50</span></div></div>
+              <div class="detected-note"><small>检测到的音符 / DETECTED NOTE</small><div>{{ nearestNote }}<span>{{ nearestOctave }}</span></div><strong>{{ detectedFrequency ? `${detectedFrequency.toFixed(1)} Hz` : '— Hz' }}</strong></div>
+              <div class="tuner-message" :class="{ inTune: listening && detectedFrequency && Math.abs(cents) <= 5 }"><span>{{ listening && detectedFrequency ? (Math.abs(cents) <= 5 ? '✓' : cents < 0 ? '↗' : '↘') : '◌' }}</span>{{ tunerStatus }}</div>
+              <p v-if="tunerError" class="error-message" role="alert">{{ tunerError }}</p>
+              <p class="privacy-note">进入调音器时自动申请麦克风权限。仅在本机分析音频，不会上传录音。</p>
+            </div>
+          </div>
+          <div class="tuner-side"><div class="card tuning-reference"><div class="section-kicker">QUICK REFERENCE</div><h2>吉他标准调弦</h2><div v-for="(string, index) in guitarStrings" :key="index" class="reference-row"><span>第 {{ index + 1 }} 弦</span><strong>{{ string.name }}{{ Math.floor(string.midi / 12) - 1 }}</strong><small>{{ Math.round(midiToFrequency(string.midi)) }} Hz</small></div></div><div class="tuner-tip"><span>✦</span><div><strong>调音小贴士</strong><p>在安静的环境下，逐根拨动琴弦并等待指针稳定。指针位于中央时最接近标准音高。</p></div></div></div>
+        </section>
       </div>
     </main>
   </div>
