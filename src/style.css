@@ -25,3 +25,17 @@
 .chart-axis{display:flex;justify-content:space-between;color:#9eafa2;font-size:9px;font-weight:700;margin-top:6px}
 .tuner-chart-group+.tuner-arc{margin-top:0}
 @media(max-width:760px){.note-picker{padding:13px;margin-top:17px}.guitar-note-picker{margin-bottom:17px}.note-picker-heading{align-items:flex-start}.note-picker-heading small{display:block;margin:3px 0 0}.tuner-chart-group{padding:13px}.tuner-pitch-chart{height:105px}}
+.piano-layout-row{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-top:24px;color:#82978a;font-size:10px;font-weight:800;letter-spacing:.08em}
+.piano-layout-options{display:flex;flex-wrap:wrap;gap:6px}
+.piano-layout-options button{border:1px solid #dbe8de;border-radius:7px;background:#fff;color:#6d8875;padding:7px 10px;font-size:10px;font-weight:800;white-space:nowrap}
+.piano-layout-options button.selected{background:#3f8256;border-color:#3f8256;color:#fff}
+.piano-layout-options button:hover:not(.selected){background:#f2f8f3}
+.piano{--white-width:calc(100% / var(--white-count));min-width:var(--piano-min-width)}
+.selected-pitch{position:absolute;left:50%;bottom:29px;z-index:3;transform:translateX(-50%);border-radius:5px;background:#408458;color:#fff;padding:4px 5px;font-size:10px;line-height:1;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px #204b2e30;pointer-events:none}
+.black-key .selected-pitch{bottom:25px;background:#86c898;color:#153627}
+.fret-open{flex:.5}
+.fret-numbers span:nth-child(2),.fret-markers span:nth-child(2){flex:.5}
+.fret-pitch{position:relative;left:auto;bottom:auto;transform:none;font-size:10px;padding:5px 4px}
+@media(max-width:760px){.piano-layout-row{align-items:flex-start;flex-direction:column}.piano-layout-options{width:100%}.piano-layout-options button{flex:1}}
+.string-row{display:grid;grid-template-columns:27px minmax(0,.5fr) repeat(15,minmax(0,1fr))}
+.fret-numbers,.fret-markers{display:grid;grid-template-columns:minmax(0,.5fr) repeat(15,minmax(0,1fr))}
