@@ -10,12 +10,13 @@ export function midiToFrequency(midi) {
   return 440 * 2 ** ((midi - 69) / 12)
 }
 
-export function playInstrument(midi, instrument = 'piano', duration = 1.5) {
+export function playInstrument(midi, instrument = 'piano', duration = 1.5, volume = 100) {
+  if (volume <= 0) return
   const ctx = audioContext()
   const now = ctx.currentTime
   const fundamental = midiToFrequency(midi)
   const output = ctx.createGain()
-  output.gain.value = 0.48
+  output.gain.value = 0.48 * Math.min(100, volume) / 100
   output.connect(ctx.destination)
 
   const harmonics = instrument === 'guitar'
@@ -38,12 +39,12 @@ export function playInstrument(midi, instrument = 'piano', duration = 1.5) {
   })
 }
 
-export function playMetronome(when, voice, intensity) {
-  if (intensity === 0) return
+export function playMetronome(when, voice, intensity, volume = 100) {
+  if (intensity === 0 || volume <= 0) return
   const ctx = audioContext()
   const gain = ctx.createGain()
   const osc = ctx.createOscillator()
-  const level = [0, 0.11, 0.22, 0.35][intensity]
+  const level = [0, 0.11, 0.22, 0.35][intensity] * Math.min(100, volume) / 100
   const settings = {
     classic: ['sine', 1050, 0.045],
     wood: ['triangle', 650, 0.07],

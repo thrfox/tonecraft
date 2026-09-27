@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Tonecraft">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#10251f"/>
+      <stop offset="1" stop-color="#294e3c"/>
+    </linearGradient>
+    <linearGradient id="light" x1="0" x2="0" y1="0" y2="1">
+      <stop stop-color="#f2f8df"/>
+      <stop offset="1" stop-color="#b9e9be"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)"/>
+  <path d="M7 38C17 47 40 58 57 35v22H7Z" fill="#8ac598" opacity=".09"/>
+  <rect x="11" y="31" width="8" height="20" rx="4" fill="url(#light)"/>
+  <rect x="22" y="18" width="8" height="33" rx="4" fill="url(#light)"/>
+  <rect x="33" y="24" width="8" height="27" rx="4" fill="#7ad098"/>
+  <rect x="44" y="34" width="8" height="17" rx="4" fill="url(#light)"/>
+  <circle cx="48" cy="17" r="4" fill="#f4cb7a"/>
+</svg>

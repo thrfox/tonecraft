@@ -22,6 +22,11 @@ const pianoVisibleNotes = ref(validNotes(saved.pianoVisibleNotes))
 const guitarVisibleNotes = ref(validNotes(saved.guitarVisibleNotes))
 const pianoHints = ref(saved.pianoHints !== false)
 const guitarHints = ref(saved.guitarHints !== false)
+const savedVolume = value => Number.isFinite(Number(value)) && value !== undefined && value !== null
+  ? Math.min(100, Math.max(0, Math.round(Number(value)))) : 100
+const pianoVolume = ref(savedVolume(saved.pianoVolume))
+const guitarVolume = ref(savedVolume(saved.guitarVolume))
+const metronomeVolume = ref(savedVolume(saved.metronomeVolume))
 function toggleNote(instrument, note) {
   const list = instrument === 'piano' ? pianoVisibleNotes : guitarVisibleNotes
   list.value = list.value.includes(note) ? list.value.filter(item => item !== note) : [...list.value, note]
@@ -54,7 +59,7 @@ const playedCount = ref(0)
 let pressTimer
 function noteLabel(midi) { return `${noteNames[midi % 12]}${Math.floor(midi / 12) - 1}` }
 function playNote(midi, instrument = 'piano') {
-  playInstrument(midi, instrument)
+  playInstrument(midi, instrument, 1.5, instrument === 'guitar' ? guitarVolume.value : pianoVolume.value)
   currentNote.value = { midi, name: noteLabel(midi), frequency: Math.round(midiToFrequency(midi)) }
   if (instrument === 'piano') selectedPianoMidi.value = midi
   pressedMidi.value = midi
@@ -114,7 +119,7 @@ function setMeter() {
 }
 function cycleAccent(index) { accents.value[index] = (accents.value[index] + 1) % 4 }
 function scheduleBeat(index, when) {
-  playMetronome(when, voice.value, accents.value[index])
+  playMetronome(when, voice.value, accents.value[index], metronomeVolume.value)
   const delay = Math.max(0, (when - audioContext().currentTime) * 1000)
   beatTimeouts.push(setTimeout(() => { if (running.value) visibleBeat.value = index }, delay))
 }
@@ -155,7 +160,7 @@ function tapTempo() {
 }
 watch(beatsPerBar, setMeter)
 watch(beatUnit, () => { if (running.value) { stopMetronome(); toggleMetronome() } })
-watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHints, guitarHints, bpm, beatsPerBar, beatUnit, voice, accents], () => {
+watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHints, guitarHints, pianoVolume, guitarVolume, metronomeVolume, bpm, beatsPerBar, beatUnit, voice, accents], () => {
   try {
     localStorage.setItem(storageKey, JSON.stringify({
       activeTab: activeTab.value,
@@ -164,6 +169,9 @@ watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHin
       guitarVisibleNotes: guitarVisibleNotes.value,
       pianoHints: pianoHints.value,
       guitarHints: guitarHints.value,
+      pianoVolume: pianoVolume.value,
+      guitarVolume: guitarVolume.value,
+      metronomeVolume: metronomeVolume.value,
       bpm: bpm.value,
       beatsPerBar: beatsPerBar.value,
       beatUnit: beatUnit.value,
@@ -393,6 +401,7 @@ onBeforeUnmount(() => {
           <div class="card instrument-card">
             <div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 01</div><h2>经典钢琴</h2></div><span class="pill">{{ noteLabel(pianoLayout.start) }} — {{ noteLabel(pianoLayout.end) }} · {{ pianoKeyCount }} KEYS</span></div>
             <div class="piano-layout-row"><span>键盘规格 / KEYBOARD SIZE</span><div class="piano-layout-options" role="group" aria-label="钢琴键盘规格"><button v-for="layout in pianoLayouts" :key="layout.keys" :class="{ selected: pianoKeyCount === layout.keys }" :aria-pressed="pianoKeyCount === layout.keys" @click="pianoKeyCount = layout.keys">{{ layout.keys }} 键</button></div></div>
+            <div class="volume-control"><div class="volume-heading"><span class="volume-symbol" aria-hidden="true">♫</span><label for="piano-volume">钢琴音量</label><strong>{{ pianoVolume }}%</strong></div><input id="piano-volume" v-model.number="pianoVolume" type="range" min="0" max="100" step="1" :style="{ '--volume-fill': `${pianoVolume}%` }" aria-label="钢琴音量"></div>
             <div class="piano-display"><div class="display-pulse">◉</div><div><small>当前音符 / NOW PLAYING</small><strong>{{ currentNote?.name || '—' }}</strong></div><div class="display-frequency">{{ currentNote ? `${currentNote.frequency} Hz` : '点击琴键开始' }}</div></div>
             <div class="piano-scroll"><div class="piano" role="group" aria-label="钢琴键盘" :style="{ '--white-count': whiteNotes.length, '--piano-min-width': `${Math.max(740, whiteNotes.length * 40)}px` }"><button v-for="note in whiteNotes" :key="note.midi" class="white-key" :class="{ active: pressedMidi === note.midi }" :aria-label="`弹奏 ${note.name}${note.octave}`" @pointerdown.prevent="playNote(note.midi)"><span v-if="selectedPianoMidi === note.midi" class="selected-pitch">{{ noteLabel(note.midi) }}</span><span v-else-if="pianoVisibleNotes.includes(note.name)" class="key-note">{{ note.name }}{{ note.octave }}</span><span v-if="pianoHints" class="key-hint">{{ hintForMidi(note.midi) }}</span></button><button v-for="note in blackNotes" :key="note.midi" class="black-key" :class="{ active: pressedMidi === note.midi }" :style="{ left: `calc(${note.afterWhite} * var(--white-width) - var(--black-width) / 2)` }" :aria-label="`弹奏 ${note.name}${note.octave}`" @pointerdown.prevent="playNote(note.midi)"><span v-if="selectedPianoMidi === note.midi" class="selected-pitch">{{ noteLabel(note.midi) }}</span><span v-else-if="pianoVisibleNotes.includes(note.name)" class="key-note">{{ note.name }}{{ note.octave }}</span><span v-if="pianoHints" class="key-hint">{{ hintForMidi(note.midi) }}</span></button></div></div>
             <div class="note-picker" aria-label="钢琴音符标记">
@@ -407,6 +416,7 @@ onBeforeUnmount(() => {
         <section v-if="activeTab === 'guitar'" class="workspace">
           <div class="card instrument-card guitar-card"><div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 02</div><h2>六弦吉他</h2></div><span class="pill">STANDARD TUNING · E A D G B e</span></div>
             <div class="guitar-topline"><div><span class="mini-dot"></span> 标准调弦 · 15 品指板</div><div class="guitar-toggles"><label class="switch-label">音调提示 <input type="checkbox" v-model="guitarHints"><span class="switch"></span></label></div></div>
+            <div class="volume-control"><div class="volume-heading"><span class="volume-symbol" aria-hidden="true">♮</span><label for="guitar-volume">吉他音量</label><strong>{{ guitarVolume }}%</strong></div><input id="guitar-volume" v-model.number="guitarVolume" type="range" min="0" max="100" step="1" :style="{ '--volume-fill': `${guitarVolume}%` }" aria-label="吉他音量"></div>
             <div class="note-picker guitar-note-picker" aria-label="吉他音符标记">
               <div class="note-picker-heading"><span>音符标记 <small>点选需要显示的音名</small></span><div><button @click="guitarVisibleNotes = [...noteNames]">全选</button><button @click="guitarVisibleNotes = []">清空</button></div></div>
               <div class="note-chips"><button v-for="name in noteNames" :key="name" :class="{ selected: guitarVisibleNotes.includes(name) }" :aria-pressed="guitarVisibleNotes.includes(name)" @click="toggleNote('guitar', name)">{{ name }}</button></div>
@@ -416,7 +426,7 @@ onBeforeUnmount(() => {
           </div><div class="info-grid"><div class="info-card"><span class="info-icon">♮</span><div><small>调弦方式</small><strong>标准调弦</strong></div></div><div class="info-card"><span class="info-icon">◎</span><div><small>当前音符</small><strong>{{ currentNote?.name || '—' }}</strong></div></div><div class="info-card"><span class="info-icon">▤</span><div><small>指板范围</small><strong>0 — 15 <em>品</em></strong></div></div></div>
         </section>
 
-        <section v-if="activeTab === 'metronome'" class="workspace metronome-layout"><div class="card metro-card"><div class="card-title-row"><div><div class="section-kicker">RHYTHM LAB</div><h2>节奏控制台</h2></div><span class="pill">20 — 400 BPM</span></div><div class="bpm-panel"><div class="bpm-label">每分钟节拍 / BEATS PER MINUTE</div><div class="bpm-control"><button aria-label="减少 BPM" @click="changeBpm(bpm - 1)">−</button><input type="number" min="20" max="400" :value="bpm" aria-label="BPM" @change="changeBpm($event.target.value)"><button aria-label="增加 BPM" @click="changeBpm(bpm + 1)">+</button></div><div class="bpm-unit">BPM</div><input class="bpm-slider" type="range" min="20" max="400" :value="bpm" aria-label="调整 BPM" @input="changeBpm($event.target.value)"><div class="range-labels"><span>20</span><span>慢速</span><span>中速</span><span>快速</span><span>400</span></div></div><div class="meter-controls"><div><label class="field-label">拍号 / TIME SIGNATURE</label><div class="meter-selects"><select v-model.number="beatsPerBar" aria-label="每小节拍数"><option v-for="n in 12" :key="n" :value="n">{{ n }}</option></select><span>/</span><select v-model.number="beatUnit" aria-label="拍号分母"><option v-for="n in [2,4,8,16]" :key="n" :value="n">{{ n }}</option></select></div></div><div><label class="field-label">间隔 / INTERVAL</label><div class="interval-readout">{{ Math.round(intervalMs) }} <span>毫秒</span></div></div></div><div class="beat-section"><div class="field-label">每拍强度 <span>点击循环：强 · 中 · 弱 · 静音</span></div><div class="beat-grid"><button v-for="(accent, index) in accents" :key="index" class="beat-button" :class="[`accent-${accent}`, { current: visibleBeat === index }]" :aria-label="`第${index + 1}拍，强度${accent}`" @click="cycleAccent(index)"><span class="beat-indicator"></span><strong>{{ String(index + 1).padStart(2, '0') }}</strong><small>{{ ['静音','弱','中','强'][accent] }}</small></button></div></div><div class="metro-actions"><button class="primary-button" @click="toggleMetronome"><span>{{ running ? '■' : '▶' }}</span>{{ running ? '停止节拍' : '开始节拍' }}</button><button class="secondary-button" @click="tapTempo">TAP 节奏</button></div></div><div class="card voice-card"><div class="section-kicker">SOUND PALETTE</div><h2>选择音色</h2><p>为节拍选择喜欢的声音。</p><div class="voice-list"><button v-for="item in voices" :key="item.value" class="voice-option" :class="{ selected: voice === item.value }" @click="voice = item.value; playMetronome(audioContext().currentTime + 0.01, item.value, 2)"><span class="voice-icon">{{ item.icon }}</span><span>{{ item.name }}</span><span class="voice-radio"></span></button></div><div class="voice-hint">♫ 选择音色时可即时试听</div></div></section>
+        <section v-if="activeTab === 'metronome'" class="workspace metronome-layout"><div class="card metro-card"><div class="card-title-row"><div><div class="section-kicker">RHYTHM LAB</div><h2>节奏控制台</h2></div><span class="pill">20 — 400 BPM</span></div><div class="bpm-panel"><div class="bpm-label">每分钟节拍 / BEATS PER MINUTE</div><div class="bpm-control"><button aria-label="减少 BPM" @click="changeBpm(bpm - 1)">−</button><input type="number" min="20" max="400" :value="bpm" aria-label="BPM" @change="changeBpm($event.target.value)"><button aria-label="增加 BPM" @click="changeBpm(bpm + 1)">+</button></div><div class="bpm-unit">BPM</div><input class="bpm-slider" type="range" min="20" max="400" :value="bpm" aria-label="调整 BPM" @input="changeBpm($event.target.value)"><div class="range-labels"><span>20</span><span>慢速</span><span>中速</span><span>快速</span><span>400</span></div></div><div class="meter-controls"><div><label class="field-label">拍号 / TIME SIGNATURE</label><div class="meter-selects"><select v-model.number="beatsPerBar" aria-label="每小节拍数"><option v-for="n in 12" :key="n" :value="n">{{ n }}</option></select><span>/</span><select v-model.number="beatUnit" aria-label="拍号分母"><option v-for="n in [2,4,8,16]" :key="n" :value="n">{{ n }}</option></select></div></div><div><label class="field-label">间隔 / INTERVAL</label><div class="interval-readout">{{ Math.round(intervalMs) }} <span>毫秒</span></div></div></div><div class="beat-section"><div class="field-label">每拍强度 <span>点击循环：强 · 中 · 弱 · 静音</span></div><div class="beat-grid"><button v-for="(accent, index) in accents" :key="index" class="beat-button" :class="[`accent-${accent}`, { current: visibleBeat === index }]" :aria-label="`第${index + 1}拍，强度${accent}`" @click="cycleAccent(index)"><span class="beat-indicator"></span><strong>{{ String(index + 1).padStart(2, '0') }}</strong><small>{{ ['静音','弱','中','强'][accent] }}</small></button></div></div><div class="metro-actions"><button class="primary-button" @click="toggleMetronome"><span>{{ running ? '■' : '▶' }}</span>{{ running ? '停止节拍' : '开始节拍' }}</button><button class="secondary-button" @click="tapTempo">TAP 节奏</button></div></div><div class="card voice-card"><div class="section-kicker">SOUND PALETTE</div><h2>选择音色</h2><p>为节拍选择喜欢的声音。</p><div class="volume-control volume-control-voice"><div class="volume-heading"><span class="volume-symbol" aria-hidden="true">◉</span><label for="metronome-volume">节拍器音量</label><strong>{{ metronomeVolume }}%</strong></div><input id="metronome-volume" v-model.number="metronomeVolume" type="range" min="0" max="100" step="1" :style="{ '--volume-fill': `${metronomeVolume}%` }" aria-label="节拍器音量"></div><div class="voice-list"><button v-for="item in voices" :key="item.value" class="voice-option" :class="{ selected: voice === item.value }" @click="voice = item.value; playMetronome(audioContext().currentTime + 0.01, item.value, 2, metronomeVolume)"><span class="voice-icon">{{ item.icon }}</span><span>{{ item.name }}</span><span class="voice-radio"></span></button></div><div class="voice-hint">♫ 选择音色时可即时试听</div></div></section>
 
         <section v-if="activeTab === 'tuner'" class="workspace tuner-layout">
           <div class="card tuner-card">
