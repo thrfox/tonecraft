@@ -103,6 +103,53 @@ const voices = [
 ]
 const accents = ref(Array.isArray(saved.accents) && saved.accents.length === beatsPerBar.value && saved.accents.every(value => Number.isInteger(value) && value >= 0 && value <= 3)
   ? [...saved.accents] : Array.from({ length: beatsPerBar.value }, (_, i) => i === 0 ? 3 : 1))
+function isValidPreset(item) {
+  return item && typeof item.id === 'string' && typeof item.name === 'string'
+    && Number.isInteger(item.bpm) && item.bpm >= 20 && item.bpm <= 400
+    && Number.isInteger(item.beatsPerBar) && item.beatsPerBar >= 1 && item.beatsPerBar <= 12
+    && [2, 4, 8, 16].includes(item.beatUnit)
+    && Array.isArray(item.accents) && item.accents.length === item.beatsPerBar
+    && item.accents.every(value => Number.isInteger(value) && value >= 0 && value <= 3)
+    && voices.some(voice => voice.value === item.voice)
+    && Number.isInteger(item.volume) && item.volume >= 0 && item.volume <= 100
+}
+const metronomePresets = ref(Array.isArray(saved.metronomePresets)
+  ? saved.metronomePresets.filter(isValidPreset).slice(-10).map(item => ({ ...item, name: item.name.slice(0, 32), accents: [...item.accents] }))
+  : [])
+const presetName = ref('')
+const loadedPresetId = ref(null)
+function savePreset() {
+  const preset = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: presetName.value.trim().slice(0, 32) || `${bpm.value} BPM · ${beatsPerBar.value}/${beatUnit.value}`,
+    bpm: bpm.value,
+    beatsPerBar: beatsPerBar.value,
+    beatUnit: beatUnit.value,
+    accents: [...accents.value],
+    voice: voice.value,
+    volume: metronomeVolume.value,
+  }
+  metronomePresets.value = [...metronomePresets.value, preset].slice(-10)
+  loadedPresetId.value = preset.id
+  presetName.value = ''
+}
+async function loadPreset(preset) {
+  const wasRunning = running.value
+  if (wasRunning) stopMetronome()
+  bpm.value = preset.bpm
+  beatsPerBar.value = preset.beatsPerBar
+  beatUnit.value = preset.beatUnit
+  accents.value = [...preset.accents]
+  voice.value = preset.voice
+  metronomeVolume.value = preset.volume
+  loadedPresetId.value = preset.id
+  await nextTick()
+  if (wasRunning) toggleMetronome()
+}
+function deletePreset(id) {
+  metronomePresets.value = metronomePresets.value.filter(preset => preset.id !== id)
+  if (loadedPresetId.value === id) loadedPresetId.value = null
+}
 const running = ref(false)
 const visibleBeat = ref(-1)
 const tapTimes = []
@@ -160,7 +207,7 @@ function tapTempo() {
 }
 watch(beatsPerBar, setMeter)
 watch(beatUnit, () => { if (running.value) { stopMetronome(); toggleMetronome() } })
-watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHints, guitarHints, pianoVolume, guitarVolume, metronomeVolume, bpm, beatsPerBar, beatUnit, voice, accents], () => {
+watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHints, guitarHints, pianoVolume, guitarVolume, metronomeVolume, bpm, beatsPerBar, beatUnit, voice, accents, metronomePresets], () => {
   try {
     localStorage.setItem(storageKey, JSON.stringify({
       activeTab: activeTab.value,
@@ -177,6 +224,7 @@ watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHin
       beatUnit: beatUnit.value,
       voice: voice.value,
       accents: accents.value,
+      metronomePresets: metronomePresets.value,
     }))
   } catch { /* Storage may be unavailable in private browsing. */ }
 }, { deep: true })
@@ -427,6 +475,30 @@ onBeforeUnmount(() => {
         </section>
 
         <section v-if="activeTab === 'metronome'" class="workspace metronome-layout"><div class="card metro-card"><div class="card-title-row"><div><div class="section-kicker">RHYTHM LAB</div><h2>节奏控制台</h2></div><span class="pill">20 — 400 BPM</span></div><div class="bpm-panel"><div class="bpm-label">每分钟节拍 / BEATS PER MINUTE</div><div class="bpm-control"><button aria-label="减少 BPM" @click="changeBpm(bpm - 1)">−</button><input type="number" min="20" max="400" :value="bpm" aria-label="BPM" @change="changeBpm($event.target.value)"><button aria-label="增加 BPM" @click="changeBpm(bpm + 1)">+</button></div><div class="bpm-unit">BPM</div><input class="bpm-slider" type="range" min="20" max="400" :value="bpm" aria-label="调整 BPM" @input="changeBpm($event.target.value)"><div class="range-labels"><span>20</span><span>慢速</span><span>中速</span><span>快速</span><span>400</span></div></div><div class="meter-controls"><div><label class="field-label">拍号 / TIME SIGNATURE</label><div class="meter-selects"><select v-model.number="beatsPerBar" aria-label="每小节拍数"><option v-for="n in 12" :key="n" :value="n">{{ n }}</option></select><span>/</span><select v-model.number="beatUnit" aria-label="拍号分母"><option v-for="n in [2,4,8,16]" :key="n" :value="n">{{ n }}</option></select></div></div><div><label class="field-label">间隔 / INTERVAL</label><div class="interval-readout">{{ Math.round(intervalMs) }} <span>毫秒</span></div></div></div><div class="beat-section"><div class="field-label">每拍强度 <span>点击循环：强 · 中 · 弱 · 静音</span></div><div class="beat-grid"><button v-for="(accent, index) in accents" :key="index" class="beat-button" :class="[`accent-${accent}`, { current: visibleBeat === index }]" :aria-label="`第${index + 1}拍，强度${accent}`" @click="cycleAccent(index)"><span class="beat-indicator"></span><strong>{{ String(index + 1).padStart(2, '0') }}</strong><small>{{ ['静音','弱','中','强'][accent] }}</small></button></div></div><div class="metro-actions"><button class="primary-button" @click="toggleMetronome"><span>{{ running ? '■' : '▶' }}</span>{{ running ? '停止节拍' : '开始节拍' }}</button><button class="secondary-button" @click="tapTempo">TAP 节奏</button></div></div><div class="card voice-card"><div class="section-kicker">SOUND PALETTE</div><h2>选择音色</h2><p>为节拍选择喜欢的声音。</p><div class="volume-control volume-control-voice"><div class="volume-heading"><span class="volume-symbol" aria-hidden="true">◉</span><label for="metronome-volume">节拍器音量</label><strong>{{ metronomeVolume }}%</strong></div><input id="metronome-volume" v-model.number="metronomeVolume" type="range" min="0" max="100" step="1" :style="{ '--volume-fill': `${metronomeVolume}%` }" aria-label="节拍器音量"></div><div class="voice-list"><button v-for="item in voices" :key="item.value" class="voice-option" :class="{ selected: voice === item.value }" @click="voice = item.value; playMetronome(audioContext().currentTime + 0.01, item.value, 2, metronomeVolume)"><span class="voice-icon">{{ item.icon }}</span><span>{{ item.name }}</span><span class="voice-radio"></span></button></div><div class="voice-hint">♫ 选择音色时可即时试听</div></div></section>
+
+        <section v-if="activeTab === 'metronome'" class="card preset-card" aria-label="已保存节奏">
+          <div class="preset-header">
+            <div><div class="section-kicker">YOUR RHYTHMS</div><h2>我的节奏</h2></div>
+            <span class="preset-count">{{ metronomePresets.length }} / 10</span>
+          </div>
+          <form class="preset-save" @submit.prevent="savePreset">
+            <input v-model="presetName" type="text" maxlength="32" aria-label="节奏名称" placeholder="给当前节奏起个名字（可选）">
+            <button class="primary-button" type="submit">＋ 保存当前节奏</button>
+          </form>
+          <p class="preset-help">保存 BPM、拍号、每拍强度、音色和音量。最多 10 个，满额后新节奏会替换最早保存的节奏。</p>
+          <div v-if="metronomePresets.length === 0" class="preset-empty">还没有保存的节奏。调整好节拍后，保存第一个吧。</div>
+          <ol v-else class="preset-list">
+            <li v-for="(preset, index) in metronomePresets" :key="preset.id" class="preset-item" :class="{ 'preset-loaded': loadedPresetId === preset.id }">
+              <span class="preset-order">{{ String(index + 1).padStart(2, '0') }}</span>
+              <div class="preset-details">
+                <div class="preset-title"><strong>{{ preset.name }}</strong><span v-if="index === 0 && metronomePresets.length === 10" class="preset-oldest">最早</span><span v-if="loadedPresetId === preset.id" class="preset-active">已载入</span></div>
+                <small>{{ preset.bpm }} BPM · {{ preset.beatsPerBar }}/{{ preset.beatUnit }} · {{ voices.find(item => item.value === preset.voice)?.name }} · 音量 {{ preset.volume }}%</small>
+                <div class="preset-beats" :aria-label="`逐拍强度：${preset.accents.map(value => ['静音','弱','中','强'][value]).join('、')}`"><span v-for="(accent, beat) in preset.accents" :key="beat" :class="`accent-${accent}`" :title="`第${beat + 1}拍：${['静音','弱','中','强'][accent]}`"></span></div>
+              </div>
+              <div class="preset-actions"><button type="button" class="preset-load" :aria-label="`载入 ${preset.name}`" @click="loadPreset(preset)">载入</button><button type="button" class="preset-delete" :aria-label="`删除 ${preset.name}`" @click="deletePreset(preset.id)">删除</button></div>
+            </li>
+          </ol>
+        </section>
 
         <section v-if="activeTab === 'tuner'" class="workspace tuner-layout">
           <div class="card tuner-card">
