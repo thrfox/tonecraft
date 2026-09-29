@@ -169,14 +169,20 @@
 .score-login .score-error{grid-column:1/-1}
 .score-error{margin:13px 0 0;color:#b75f55;font-size:12px}
 .score-success{margin:13px 0 0;color:#3b8b59;font-size:12px}
-.score-preview-backdrop{position:fixed;inset:0;z-index:100;background:#14271dcc;display:grid;place-items:center;padding:20px}
-.score-preview{display:flex;flex-direction:column;width:min(1100px,100%);height:min(850px,calc(100dvh - 40px));background:#fff;border-radius:15px;overflow:hidden;box-shadow:0 24px 70px #0e271b66}
+.score-preview-backdrop{position:fixed;inset:0;z-index:100;background:#14271dcc;display:grid;place-items:center;padding:12px}
+.score-preview{display:flex;flex-direction:column;width:min(1720px,100%);height:calc(100dvh - 24px);background:#fff;border-radius:15px;overflow:hidden;box-shadow:0 24px 70px #0e271b66}
 .score-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:14px 20px;border-bottom:1px solid #e6eee7}
 .score-preview-bar>div{min-width:0;display:flex;align-items:center;gap:13px}
 .score-preview-bar strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#2d4c38;font-size:14px}
 .score-preview-bar small{color:#90a596;font-size:11px}
 .score-preview-bar a{white-space:nowrap;color:#4b8760;font-size:11px;font-weight:800}
 .score-preview-bar button{width:34px;height:34px;flex:none;border:0;border-radius:8px;background:#f0f5f1;color:#4c7457;font-size:24px;cursor:pointer}
+.score-preview-bar .score-expand-button{width:auto;padding:0 12px;font-size:11px;font-weight:800}
+.score-preview-backdrop.is-image-fullscreen{padding:0;background:#14271d}
+.is-image-fullscreen .score-preview{width:100vw;height:100dvh;border-radius:0;box-shadow:none}
+.is-image-fullscreen .score-preview-bar{position:relative;z-index:2;border:0;background:#14271d}
+.is-image-fullscreen .score-preview-bar strong,.is-image-fullscreen .score-preview-bar small,.is-image-fullscreen .score-preview-bar a{color:#fff}
+.is-image-fullscreen .score-preview-bar button{background:#ffffff26;color:#fff}
 .score-preview-body{flex:1;min-height:0;overflow:auto;background:#f4f6f4}
 .score-preview-body.score-preview-image{overflow:hidden}
 .score-image-stage{position:relative;display:block;width:100%;height:100%;padding:0;border:0;overflow:hidden;background:#f4f6f4;cursor:zoom-in;touch-action:manipulation}

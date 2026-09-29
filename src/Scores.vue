@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { compressScoreImage } from './imageCompression'
 import { scoreBucket, supabase } from './supabase'
 
 const scores = ref([])
@@ -13,6 +14,7 @@ const password = ref('')
 const loginBusy = ref(false)
 const loginError = ref('')
 const uploadBusy = ref(false)
+const uploadStep = ref('')
 const uploadError = ref('')
 const uploadSuccess = ref('')
 const title = ref('')
@@ -23,6 +25,7 @@ const selected = ref(null)
 const imageStage = ref(null)
 const imageElement = ref(null)
 const imageZoom = ref(1)
+const imageFullscreen = ref(false)
 const imageOffset = ref({ x: 0, y: 0 })
 const previewError = ref('')
 const previewBusy = ref(false)
@@ -152,29 +155,42 @@ async function uploadScore() {
   const ext = extensionOf(file.value.name)
   if (!name || name.length > 120) { uploadError.value = '请输入不超过 120 个字的曲谱标题。'; return }
   if (!acceptedTypes[ext]) { uploadError.value = '支持 PDF、PNG、JPG、WebP、MusicXML 和 XML 文件。'; return }
-  if (file.value.size > 15 * 1024 * 1024) { uploadError.value = '单个文件不能超过 15 MB。'; return }
+  const original = file.value
+  const isImage = ['png', 'jpg', 'jpeg', 'webp'].includes(ext)
+  if (!isImage && original.size > 15 * 1024 * 1024) { uploadError.value = '单个文件不能超过 15 MB。'; return }
   uploadBusy.value = true
-  const path = `${crypto.randomUUID()}.${ext}`
-  const { error: fileError } = await supabase.storage.from(scoreBucket).upload(path, file.value, { contentType: acceptedTypes[ext], upsert: false })
-  if (fileError) {
-    uploadError.value = `文件上传失败：${fileError.message}`
-    uploadBusy.value = false
-    return
-  }
-  const { error: rowError } = await supabase.from('scores').insert({ title: name, composer: composer.value.trim() || null, storage_path: path, file_type: ext })
-  if (rowError) {
-    await supabase.storage.from(scoreBucket).remove([path])
-    uploadError.value = `曲谱登记失败：${rowError.message}`
-  } else {
-    uploadSuccess.value = '曲谱已上传，访客现在可以阅读。'
+  try {
+    uploadStep.value = isImage ? 'compressing' : 'uploading'
+    const prepared = isImage ? await compressScoreImage(original) : original
+    if (prepared.size > 15 * 1024 * 1024) {
+      uploadError.value = '压缩后文件仍超过 15 MB，请换一张尺寸更小的图片。'
+      return
+    }
+    uploadStep.value = 'uploading'
+    const preparedExt = extensionOf(prepared.name)
+    const path = `${crypto.randomUUID()}.${preparedExt}`
+    const { error: fileError } = await supabase.storage.from(scoreBucket).upload(path, prepared, { contentType: acceptedTypes[preparedExt], upsert: false })
+    if (fileError) { uploadError.value = `文件上传失败：${fileError.message}`; return }
+    const { error: rowError } = await supabase.from('scores').insert({ title: name, composer: composer.value.trim() || null, storage_path: path, file_type: preparedExt })
+    if (rowError) {
+      await supabase.storage.from(scoreBucket).remove([path])
+      uploadError.value = `曲谱登记失败：${rowError.message}`
+      return
+    }
+    const saved = prepared.size < original.size ? `图片已缩小 ${Math.round((1 - prepared.size / original.size) * 100)}%。` : ''
+    uploadSuccess.value = `曲谱已上传，访客现在可以阅读。${saved}`
     title.value = ''
     composer.value = ''
     file.value = null
     const input = document.getElementById('score-file')
     if (input) input.value = ''
     await loadScores()
+  } catch (error) {
+    uploadError.value = `文件处理或上传失败：${error?.message || '请重试。'}`
+  } finally {
+    uploadBusy.value = false
+    uploadStep.value = ''
   }
-  uploadBusy.value = false
 }
 
 async function deleteScore(row) {
@@ -190,6 +206,18 @@ async function deleteScore(row) {
 }
 
 function resetImageZoom() {
+  imageFullscreen.value = false
+  imageZoom.value = 1
+  imageOffset.value = { x: 0, y: 0 }
+  imageDrag = null
+  suppressZoomClick = false
+}
+
+function exitImageFullscreen() {
+  resetImageZoom()
+}
+
+function handleImageResize() {
   imageZoom.value = 1
   imageOffset.value = { x: 0, y: 0 }
   imageDrag = null
@@ -210,7 +238,13 @@ function clampImageOffset(x, y, zoom = imageZoom.value) {
 
 function toggleImageZoom(event) {
   if (suppressZoomClick) { suppressZoomClick = false; return }
-  if (imageZoom.value > 1) { resetImageZoom(); return }
+  if (!imageFullscreen.value) {
+    imageFullscreen.value = true
+    imageZoom.value = 1
+    imageOffset.value = { x: 0, y: 0 }
+    return
+  }
+  if (imageZoom.value > 1) { handleImageResize(); return }
   const stage = imageStage.value
   if (!stage) return
   const zoom = 2.5
@@ -241,7 +275,11 @@ function endImageDrag(event) {
 }
 
 function closePreview() { selected.value = null; previewRequest++; resetImageZoom() }
-function handleEscape(event) { if (event.key === 'Escape') closePreview() }
+function handleEscape(event) {
+  if (event.key !== 'Escape') return
+  if (imageFullscreen.value) exitImageFullscreen()
+  else closePreview()
+}
 
 watch(selected, async (row, oldRow) => {
   if (row && !oldRow) {
@@ -273,7 +311,7 @@ watch(selected, async (row, oldRow) => {
 onMounted(async () => {
   document.addEventListener('keydown', handleEscape)
   document.addEventListener('paste', handlePaste)
-  window.addEventListener('resize', resetImageZoom)
+  window.addEventListener('resize', handleImageResize)
   if (!supabase) return
   await Promise.all([loadScores(), refreshIdentity()])
   const { data } = supabase.auth.onAuthStateChange(() => { setTimeout(refreshIdentity, 0) })
@@ -283,7 +321,7 @@ onBeforeUnmount(() => {
   if (selected.value) document.body.style.overflow = previousBodyOverflow
   document.removeEventListener('keydown', handleEscape)
   document.removeEventListener('paste', handlePaste)
-  window.removeEventListener('resize', resetImageZoom)
+  window.removeEventListener('resize', handleImageResize)
   authSubscription?.unsubscribe()
   previewRequest++
 })
@@ -314,9 +352,9 @@ onBeforeUnmount(() => {
           <form class="score-form" @submit.prevent="uploadScore">
             <label>曲谱标题 <input v-model="title" required maxlength="120" placeholder="例如：小星星"></label>
             <label>作者 / 来源 <input v-model="composer" maxlength="120" placeholder="选填"></label>
-            <label class="score-file-label">曲谱文件 <input id="score-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.musicxml,.xml" @change="chooseFile"><small>PDF、图片或 MusicXML · 最大 15 MB</small></label>
+            <label class="score-file-label">曲谱文件 <input id="score-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,.musicxml,.xml" :disabled="uploadBusy" @change="chooseFile"><small>图片上传前自动压缩；PDF、图片或 MusicXML · 上传上限 15 MB</small></label>
             <div class="score-paste-field"><span>也可以复制粘贴</span><textarea ref="pasteZone" class="score-paste-zone" rows="2" aria-label="粘贴曲谱" placeholder="点这里后按 Ctrl+V / ⌘V，或在手机上长按粘贴图片、文件、MusicXML 文本"></textarea><small v-if="file" class="score-selected-file">已准备：{{ file.name }}（{{ (file.size / 1024 / 1024).toFixed(2) }} MB）</small></div>
-            <button class="primary-button" type="submit" :disabled="uploadBusy">{{ uploadBusy ? '上传中…' : '上传并发布' }}</button>
+            <button class="primary-button" type="submit" :disabled="uploadBusy">{{ uploadBusy ? (uploadStep === 'compressing' ? '正在压缩图片…' : '上传中…') : '上传并发布' }}</button>
           </form>
           <p v-if="uploadError" class="score-error" role="alert">{{ uploadError }}</p><p v-if="uploadSuccess" class="score-success" role="status">{{ uploadSuccess }}</p>
         </template>
@@ -327,7 +365,26 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div v-if="selected" class="score-preview-backdrop" @click.self="closePreview"><div class="score-preview" role="dialog" aria-modal="true" :aria-label="`预览 ${selected.title}`"><div class="score-preview-bar"><div><strong>{{ selected.title }}</strong><small>{{ selected.composer || '曲谱预览' }}</small></div><div><a :href="selectedUrl" target="_blank" rel="noopener noreferrer">打开原文件 ↗</a><button type="button" aria-label="关闭预览" @click="closePreview">×</button></div></div><div class="score-preview-body" :class="{ 'score-preview-image': fileKind(selected) === 'image' }"><button v-if="fileKind(selected) === 'image'" ref="imageStage" class="score-image-stage" :class="{ 'is-zoomed': imageZoom > 1 }" type="button" :aria-label="imageZoom > 1 ? '缩小曲谱图片' : '放大曲谱图片'" @click="toggleImageZoom" @pointerdown="startImageDrag" @pointermove="moveImageDrag" @pointerup="endImageDrag" @pointercancel="endImageDrag"><img ref="imageElement" :src="selectedUrl" :alt="selected.title" draggable="false" :style="{ transform: `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${imageZoom})` }"><span class="score-image-hint">{{ imageZoom > 1 ? '拖动查看 · 点击还原' : '点击图片放大' }}</span></button><iframe v-else-if="fileKind(selected) === 'pdf'" :src="selectedUrl" :title="selected.title"></iframe><div v-else class="score-musicxml"><p v-if="previewBusy">正在排版曲谱…</p><p v-if="previewError" class="score-error" role="alert">{{ previewError }}</p><div ref="musicContainer"></div></div></div></div></div>
+    <div v-if="selected" class="score-preview-backdrop" :class="{ 'is-image-fullscreen': imageFullscreen }" @click.self="closePreview">
+      <div class="score-preview" role="dialog" aria-modal="true" :aria-label="`预览 ${selected.title}`">
+        <div class="score-preview-bar">
+          <div><strong>{{ selected.title }}</strong><small>{{ selected.composer || '曲谱预览' }}</small></div>
+          <div>
+            <a :href="selectedUrl" target="_blank" rel="noopener noreferrer">打开原文件 ↗</a>
+            <button v-if="imageFullscreen" class="score-expand-button" type="button" @click="exitImageFullscreen">退出全屏</button>
+            <button type="button" aria-label="关闭预览" @click="closePreview">×</button>
+          </div>
+        </div>
+        <div class="score-preview-body" :class="{ 'score-preview-image': fileKind(selected) === 'image' }">
+          <button v-if="fileKind(selected) === 'image'" ref="imageStage" class="score-image-stage" :class="{ 'is-zoomed': imageZoom > 1 }" type="button" :aria-label="!imageFullscreen ? '全屏查看曲谱图片' : imageZoom > 1 ? '缩小曲谱图片' : '放大曲谱细节'" @click="toggleImageZoom" @pointerdown="startImageDrag" @pointermove="moveImageDrag" @pointerup="endImageDrag" @pointercancel="endImageDrag">
+            <img ref="imageElement" :src="selectedUrl" :alt="selected.title" draggable="false" :style="{ transform: `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${imageZoom})` }">
+            <span class="score-image-hint">{{ !imageFullscreen ? '点击全屏查看' : imageZoom > 1 ? '拖动查看 · 点击还原' : '已适配全屏 · 点击放大细节' }}</span>
+          </button>
+          <iframe v-else-if="fileKind(selected) === 'pdf'" :src="selectedUrl" :title="selected.title"></iframe>
+          <div v-else class="score-musicxml"><p v-if="previewBusy">正在排版曲谱…</p><p v-if="previewError" class="score-error" role="alert">{{ previewError }}</p><div ref="musicContainer"></div></div>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
