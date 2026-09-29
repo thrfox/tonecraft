@@ -32,7 +32,7 @@ pnpm build
 曲谱文件保存在 Supabase Storage 的公开 `scores` bucket，曲谱列表保存在 `public.scores` 表。访客无需登录即可阅读；只有 `public.score_admins` 中登记的 Supabase Auth 用户可以上传和删除。权限由 Supabase RLS 执行，前端的登录界面和按钮显隐只改善操作体验。
 
 1. 在专用 Supabase 项目中应用 `supabase/score_library.sql`。
-2. 在 Supabase Auth 中创建管理员用户，然后将该用户的 UUID 加入 `public.score_admins`。管理员登录使用该用户的邮箱和密码；前端不提供注册入口。
+2. 在 Supabase Auth 中创建管理员用户，让本人自行设置密码。然后在 SQL Editor 中运行 `insert into public.score_admins (id) select id from auth.users where email = 'OWNER_EMAIL_HERE';`，将占位符换成管理员邮箱。前端不提供注册入口。
 3. 本地复制 `.env.example` 为 `.env.local`，只填写项目 URL 和 **publishable key**。
 4. GitHub 仓库的 Actions Variables 中设置 `TONECRAFT_SUPABASE_URL`，Actions Secrets 中设置 `TONECRAFT_SUPABASE_PUBLISHABLE_KEY`。工作流构建时读取这两个值。
 
