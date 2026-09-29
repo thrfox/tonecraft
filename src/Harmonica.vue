@@ -142,7 +142,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="harmonica-workspace workspace" aria-label="三角洲口琴模拟器">
     <div class="card harmonica-card">
-      <div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 03</div><h2>三角洲口琴</h2></div><span class="pill">C2 — C5 · 8 NOTES</span></div>
+      <div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 03</div><h2>三角洲口琴</h2></div><span class="pill">C3 — C6 · 8 NOTES</span></div>
       <div class="harmonica-hero">
         <div class="harmonica-breath" :class="{ sounding: heldKeys.length }" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
         <div class="harmonica-readout"><small>当前音高 / NOW PLAYING</small><strong>{{ currentName }}</strong><span>{{ heldKeys.length ? '正在吹奏' : '按住键盘或下方音孔开始吹奏' }}</span></div>
@@ -151,13 +151,13 @@ onBeforeUnmount(() => {
 
       <div class="harmonica-control-label"><span>音域控制 / OCTAVE</span><small>电脑按住鼠标；手机按住下方控制键</small></div>
       <div class="harmonica-modifiers">
-        <button type="button" :class="{ active: low }" :aria-pressed="low" @pointerdown="onModifierPointerDown($event, 'low')"><span class="harmonica-mouse-icon">◖</span><strong>低音</strong><small>鼠标左键 · C2–C3</small></button>
-        <div class="harmonica-middle" :class="{ active: octave === 'middle' }"><strong>{{ octaveLabel }}</strong><small>{{ octave === 'low' ? 'C2–C3' : octave === 'high' ? 'C4–C5' : 'C3–C4' }}</small></div>
-        <button type="button" :class="{ active: high }" :aria-pressed="high" @pointerdown="onModifierPointerDown($event, 'high')"><span class="harmonica-mouse-icon">◗</span><strong>高音</strong><small>鼠标右键 · C4–C5</small></button>
+        <button type="button" :class="{ active: low }" :aria-pressed="low" @pointerdown="onModifierPointerDown($event, 'low')"><span class="harmonica-mouse-icon">◖</span><strong>低音</strong><small>鼠标左键 · C3–C4</small></button>
+        <div class="harmonica-middle" :class="{ active: octave === 'middle' }"><strong>{{ octaveLabel }}</strong><small>{{ octave === 'low' ? 'C3–C4' : octave === 'high' ? 'C5–C6' : 'C4–C5' }}</small></div>
+        <button type="button" :class="{ active: high }" :aria-pressed="high" @pointerdown="onModifierPointerDown($event, 'high')"><span class="harmonica-mouse-icon">◗</span><strong>高音</strong><small>鼠标右键 · C5–C6</small></button>
         <button type="button" class="harmonica-sharp" :class="{ active: sharp }" :aria-pressed="sharp" @pointerdown="onModifierPointerDown($event, 'sharp')"><span class="harmonica-mouse-icon">♯</span><strong>升半音</strong><small>鼠标中键 · 可组合</small></button>
       </div>
 
-      <div class="harmonica-control-label"><span>吹奏音孔 / PLAY</span><small>按住发声，松开后自然收尾</small></div>
+      <div class="harmonica-control-label"><span>吹奏音孔 / PLAY</span><small>按住 0.5 秒渐强，松开后 0.5 秒渐弱</small></div>
       <div class="harmonica-keys" role="group" aria-label="口琴音孔">
         <button v-for="note in harmonicaKeys" :key="note.key" type="button" class="harmonica-key" :class="{ active: heldKeys.includes(note.key) }" :aria-label="`${note.degree} 音，键盘 ${note.key === ',' ? '逗号' : note.key}，${harmonicaNoteName(harmonicaMidi(note.key, octave, sharp))}`" @pointerdown="onNotePointerDown($event, note.key)">
           <span class="harmonica-hole"></span><span class="harmonica-degree">{{ note.degree }}</span><span class="harmonica-pitch">{{ harmonicaNoteName(harmonicaMidi(note.key, octave, sharp)) }}</span><kbd>{{ note.key === ',' ? ',' : note.key.toUpperCase() }}</kbd>
@@ -166,7 +166,7 @@ onBeforeUnmount(() => {
 
       <div class="harmonica-footer"><div class="volume-control"><div class="volume-heading"><span class="volume-symbol" aria-hidden="true">♫</span><label for="harmonica-volume">口琴音量</label><strong>{{ volume }}%</strong></div><input id="harmonica-volume" type="range" min="0" max="100" step="1" :value="volume" :style="{ '--volume-fill': `${volume}%` }" aria-label="口琴音量" @input="emit('update:volume', Number($event.target.value))"></div><p>键盘 <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> <kbd>N</kbd> <kbd>M</kbd> <kbd>,</kbd> 对应 1–7、i。松开鼠标时，按住的音会立即回到中音。</p></div>
     </div>
-    <div class="info-grid"><div class="info-card"><span class="info-icon">♫</span><div><small>完整音域</small><strong>C2 — C5</strong></div></div><div class="info-card"><span class="info-icon">◉</span><div><small>当前音区</small><strong>{{ octaveLabel }}{{ sharp ? ' · 升半音' : '' }}</strong></div></div><div class="info-card"><span class="info-icon">▦</span><div><small>累计吹奏</small><strong>{{ playedCount }} <em>次</em></strong></div></div></div>
+    <div class="info-grid"><div class="info-card"><span class="info-icon">♫</span><div><small>完整音域</small><strong>C3 — C6</strong></div></div><div class="info-card"><span class="info-icon">◉</span><div><small>当前音区</small><strong>{{ octaveLabel }}{{ sharp ? ' · 升半音' : '' }}</strong></div></div><div class="info-card"><span class="info-icon">▦</span><div><small>累计吹奏</small><strong>{{ playedCount }} <em>次</em></strong></div></div></div>
   </section>
 </template>
 
