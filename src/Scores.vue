@@ -20,11 +20,18 @@ const composer = ref('')
 const file = ref(null)
 const pasteZone = ref(null)
 const selected = ref(null)
+const imageStage = ref(null)
+const imageElement = ref(null)
+const imageZoom = ref(1)
+const imageOffset = ref({ x: 0, y: 0 })
 const previewError = ref('')
 const previewBusy = ref(false)
 const musicContainer = ref(null)
 let authSubscription
 let previewRequest = 0
+let imageDrag = null
+let suppressZoomClick = false
+let previousBodyOverflow = ''
 
 const acceptedTypes = {
   pdf: 'application/pdf',
@@ -182,10 +189,66 @@ async function deleteScore(row) {
   }
 }
 
-function closePreview() { selected.value = null; previewRequest++ }
+function resetImageZoom() {
+  imageZoom.value = 1
+  imageOffset.value = { x: 0, y: 0 }
+  imageDrag = null
+  suppressZoomClick = false
+}
+
+function clampImageOffset(x, y, zoom = imageZoom.value) {
+  const stage = imageStage.value
+  const image = imageElement.value
+  if (!stage || !image?.naturalWidth || !image?.naturalHeight) return { x: 0, y: 0 }
+  const width = stage.clientWidth
+  const height = stage.clientHeight
+  const fit = Math.min(width / image.naturalWidth, height / image.naturalHeight)
+  const maxX = Math.max(0, (image.naturalWidth * fit * zoom - width) / 2)
+  const maxY = Math.max(0, (image.naturalHeight * fit * zoom - height) / 2)
+  return { x: Math.max(-maxX, Math.min(maxX, x)), y: Math.max(-maxY, Math.min(maxY, y)) }
+}
+
+function toggleImageZoom(event) {
+  if (suppressZoomClick) { suppressZoomClick = false; return }
+  if (imageZoom.value > 1) { resetImageZoom(); return }
+  const stage = imageStage.value
+  if (!stage) return
+  const zoom = 2.5
+  const bounds = stage.getBoundingClientRect()
+  const x = event.detail ? event.clientX - bounds.left : bounds.width / 2
+  const y = event.detail ? event.clientY - bounds.top : bounds.height / 2
+  imageZoom.value = zoom
+  imageOffset.value = clampImageOffset((bounds.width / 2 - x) * (zoom - 1), (bounds.height / 2 - y) * (zoom - 1), zoom)
+}
+
+function startImageDrag(event) {
+  if (imageZoom.value === 1) return
+  imageDrag = { x: event.clientX, y: event.clientY, offset: { ...imageOffset.value }, moved: false }
+  event.currentTarget.setPointerCapture(event.pointerId)
+}
+
+function moveImageDrag(event) {
+  if (!imageDrag) return
+  const dx = event.clientX - imageDrag.x
+  const dy = event.clientY - imageDrag.y
+  if (Math.abs(dx) + Math.abs(dy) > 4) imageDrag.moved = true
+  imageOffset.value = clampImageOffset(imageDrag.offset.x + dx, imageDrag.offset.y + dy)
+}
+
+function endImageDrag(event) {
+  if (event.type === 'pointerup' && imageDrag?.moved) suppressZoomClick = true
+  imageDrag = null
+}
+
+function closePreview() { selected.value = null; previewRequest++; resetImageZoom() }
 function handleEscape(event) { if (event.key === 'Escape') closePreview() }
 
-watch(selected, async row => {
+watch(selected, async (row, oldRow) => {
+  if (row && !oldRow) {
+    previousBodyOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  } else if (!row && oldRow) document.body.style.overflow = previousBodyOverflow
+  resetImageZoom()
   previewError.value = ''
   if (!row || fileKind(row) !== 'musicxml') return
   const request = ++previewRequest
@@ -210,14 +273,17 @@ watch(selected, async row => {
 onMounted(async () => {
   document.addEventListener('keydown', handleEscape)
   document.addEventListener('paste', handlePaste)
+  window.addEventListener('resize', resetImageZoom)
   if (!supabase) return
   await Promise.all([loadScores(), refreshIdentity()])
   const { data } = supabase.auth.onAuthStateChange(() => { setTimeout(refreshIdentity, 0) })
   authSubscription = data.subscription
 })
 onBeforeUnmount(() => {
+  if (selected.value) document.body.style.overflow = previousBodyOverflow
   document.removeEventListener('keydown', handleEscape)
   document.removeEventListener('paste', handlePaste)
+  window.removeEventListener('resize', resetImageZoom)
   authSubscription?.unsubscribe()
   previewRequest++
 })
@@ -261,7 +327,7 @@ onBeforeUnmount(() => {
       </div>
     </template>
 
-    <div v-if="selected" class="score-preview-backdrop" @click.self="closePreview"><div class="score-preview" role="dialog" aria-modal="true" :aria-label="`预览 ${selected.title}`"><div class="score-preview-bar"><div><strong>{{ selected.title }}</strong><small>{{ selected.composer || '曲谱预览' }}</small></div><div><a :href="selectedUrl" target="_blank" rel="noopener noreferrer">打开原文件 ↗</a><button type="button" aria-label="关闭预览" @click="closePreview">×</button></div></div><div class="score-preview-body"><img v-if="fileKind(selected) === 'image'" :src="selectedUrl" :alt="selected.title"><iframe v-else-if="fileKind(selected) === 'pdf'" :src="selectedUrl" :title="selected.title"></iframe><div v-else class="score-musicxml"><p v-if="previewBusy">正在排版曲谱…</p><p v-if="previewError" class="score-error" role="alert">{{ previewError }}</p><div ref="musicContainer"></div></div></div></div></div>
+    <div v-if="selected" class="score-preview-backdrop" @click.self="closePreview"><div class="score-preview" role="dialog" aria-modal="true" :aria-label="`预览 ${selected.title}`"><div class="score-preview-bar"><div><strong>{{ selected.title }}</strong><small>{{ selected.composer || '曲谱预览' }}</small></div><div><a :href="selectedUrl" target="_blank" rel="noopener noreferrer">打开原文件 ↗</a><button type="button" aria-label="关闭预览" @click="closePreview">×</button></div></div><div class="score-preview-body" :class="{ 'score-preview-image': fileKind(selected) === 'image' }"><button v-if="fileKind(selected) === 'image'" ref="imageStage" class="score-image-stage" :class="{ 'is-zoomed': imageZoom > 1 }" type="button" :aria-label="imageZoom > 1 ? '缩小曲谱图片' : '放大曲谱图片'" @click="toggleImageZoom" @pointerdown="startImageDrag" @pointermove="moveImageDrag" @pointerup="endImageDrag" @pointercancel="endImageDrag"><img ref="imageElement" :src="selectedUrl" :alt="selected.title" draggable="false" :style="{ transform: `translate(${imageOffset.x}px, ${imageOffset.y}px) scale(${imageZoom})` }"><span class="score-image-hint">{{ imageZoom > 1 ? '拖动查看 · 点击还原' : '点击图片放大' }}</span></button><iframe v-else-if="fileKind(selected) === 'pdf'" :src="selectedUrl" :title="selected.title"></iframe><div v-else class="score-musicxml"><p v-if="previewBusy">正在排版曲谱…</p><p v-if="previewError" class="score-error" role="alert">{{ previewError }}</p><div ref="musicContainer"></div></div></div></div></div>
   </section>
 </template>
 

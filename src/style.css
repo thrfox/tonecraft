@@ -178,7 +178,13 @@
 .score-preview-bar a{white-space:nowrap;color:#4b8760;font-size:11px;font-weight:800}
 .score-preview-bar button{width:34px;height:34px;flex:none;border:0;border-radius:8px;background:#f0f5f1;color:#4c7457;font-size:24px;cursor:pointer}
 .score-preview-body{flex:1;min-height:0;overflow:auto;background:#f4f6f4}
-.score-preview-body>img{display:block;max-width:100%;height:auto;margin:auto;box-shadow:0 8px 25px #20372722}
+.score-preview-body.score-preview-image{overflow:hidden}
+.score-image-stage{position:relative;display:block;width:100%;height:100%;padding:0;border:0;overflow:hidden;background:#f4f6f4;cursor:zoom-in;touch-action:manipulation}
+.score-image-stage.is-zoomed{cursor:grab;touch-action:none}
+.score-image-stage.is-zoomed:active{cursor:grabbing}
+.score-image-stage>img{display:block;width:100%;height:100%;object-fit:contain;user-select:none;pointer-events:none;will-change:transform}
+.score-image-hint{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);padding:8px 12px;border-radius:999px;background:#203727cc;color:#fff;font-size:11px;font-weight:700;white-space:nowrap;pointer-events:none}
+.score-image-stage:focus-visible{outline:3px solid #4b9363;outline-offset:-3px}
 .score-preview-body>iframe{display:block;width:100%;height:100%;border:0;background:#fff}
 .score-musicxml{padding:20px;min-height:100%;background:#fff}
 .score-musicxml>p{text-align:center;color:#809988;font-size:12px}
