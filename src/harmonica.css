@@ -1,0 +1,46 @@
+.harmonica-workspace{display:grid;gap:17px}
+.harmonica-card{padding:29px 32px;overflow:hidden}
+.harmonica-hero{display:grid;grid-template-columns:120px minmax(0,1fr) auto;align-items:center;gap:25px;min-height:154px;margin:24px 0 26px;padding:26px 32px;border-radius:16px;background:radial-gradient(circle at 17% 50%,#3c8058 0%,#1e4532 43%,#122d26 100%);color:#fff}
+.harmonica-breath{display:flex;align-items:center;justify-content:center;gap:8px;height:76px}
+.harmonica-breath span{display:block;width:7px;height:25px;border-radius:20px;background:#b0edbd;opacity:.45;transition:height .12s ease,opacity .12s ease}
+.harmonica-breath span:nth-child(2),.harmonica-breath span:nth-child(4){height:42px}
+.harmonica-breath span:nth-child(3){height:65px}
+.harmonica-breath.sounding span{opacity:1;animation:harmonica-breathe .65s ease-in-out infinite alternate}
+.harmonica-breath.sounding span:nth-child(2){animation-delay:.1s}.harmonica-breath.sounding span:nth-child(3){animation-delay:.18s}.harmonica-breath.sounding span:nth-child(4){animation-delay:.27s}.harmonica-breath.sounding span:nth-child(5){animation-delay:.36s}
+@keyframes harmonica-breathe{from{transform:scaleY(.5)}to{transform:scaleY(1.15)}}
+.harmonica-readout{display:grid;gap:5px;min-width:0}
+.harmonica-readout small{color:#a7d2b2;font-size:10px;font-weight:800;letter-spacing:.14em}
+.harmonica-readout strong{font-size:55px;line-height:1.05;letter-spacing:-.04em;font-weight:800}
+.harmonica-readout>span{color:#c3d8c8;font-size:11px}
+.harmonica-status{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;max-width:174px}
+.harmonica-status span{padding:6px 9px;border:1px solid #ffffff25;border-radius:99px;color:#b4cfbd;font-size:10px;font-weight:800}
+.harmonica-status span.active{border-color:#9be3aa;background:#c5f0ce;color:#1d5132}
+.harmonica-control-label{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:25px 0 11px;color:#597461;font-size:11px;font-weight:800;letter-spacing:.06em}
+.harmonica-control-label small{color:#98aa9c;font-size:10px;font-weight:600;letter-spacing:0}
+.harmonica-modifiers{display:grid;grid-template-columns:1fr .85fr 1fr 1fr;gap:10px}
+.harmonica-modifiers>button,.harmonica-middle{min-width:0;min-height:83px;display:grid;grid-template-columns:auto 1fr;align-content:center;column-gap:11px;row-gap:3px;text-align:left;padding:14px 16px;border:1px solid #dde9df;border-radius:11px;background:#f8fbf8;color:#456e51;touch-action:none;user-select:none}
+.harmonica-modifiers>button{cursor:pointer;font:inherit}
+.harmonica-modifiers>button:hover{border-color:#8ab998;background:#f0f8f1}
+.harmonica-modifiers>button.active{border-color:#4b9965;background:#e2f4e7;box-shadow:inset 0 0 0 1px #4b9965}
+.harmonica-modifiers .harmonica-middle{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:#e9f2ea;border-color:#d4e5d7}
+.harmonica-modifiers .harmonica-middle.active{background:#d8eedf;border-color:#83bc92}
+.harmonica-mouse-icon{grid-row:1/3;align-self:center;display:grid;place-items:center;width:35px;height:35px;border-radius:9px;background:#e6f2e8;color:#4c9762;font-size:19px;font-weight:800}
+.harmonica-modifiers strong{font-size:13px}.harmonica-modifiers small{color:#8da491;font-size:10px;white-space:nowrap}
+.harmonica-keys{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:9px;padding:18px;border:1px solid #dde8df;border-radius:16px;background:linear-gradient(135deg,#eaf1ea,#f5f9f5)}
+.harmonica-key{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;min-width:0;min-height:194px;padding:14px 4px;border:1px solid #d8e4d9;border-bottom:5px solid #b8d3bf;border-radius:12px;background:linear-gradient(#fff,#f7fbf7);color:#315b3e;box-shadow:0 4px 9px #1f523119;cursor:pointer;touch-action:none;user-select:none;transition:transform .1s,background .1s,border-color .1s}
+.harmonica-key:hover{border-color:#84b895;background:#f3fbf4}
+.harmonica-key.active{transform:translateY(3px);border-color:#41915b;border-bottom-color:#317649;background:#dff3e4;box-shadow:0 1px 6px #1f523119}
+.harmonica-hole{display:block;width:min(54px,70%);aspect-ratio:1;border:7px solid #d7e8db;border-radius:50%;background:radial-gradient(circle,#203d30,#152920);box-shadow:inset 0 3px 7px #0008,0 3px 5px #22482c22}
+.harmonica-key.active .harmonica-hole{border-color:#76bd8a;box-shadow:inset 0 3px 7px #0008,0 0 13px #63be7f88}
+.harmonica-degree{font-size:27px;line-height:1;font-weight:800}
+.harmonica-pitch{font-size:12px;color:#6b9175;font-weight:800}
+.harmonica-key kbd{display:grid;place-items:center;min-width:26px;height:23px;margin-top:3px;padding:0 6px;border:1px solid #dce7dd;border-radius:5px;background:#edf4ee;color:#74917c;font-size:10px;font-weight:800;font-family:inherit}
+.harmonica-footer{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-top:20px}
+.harmonica-footer .volume-control{width:280px;flex:none;margin:0}
+.harmonica-footer p{max-width:450px;margin:0 0 4px;color:#8da193;font-size:11px;line-height:1.9}
+.harmonica-footer kbd{padding:2px 4px;border:1px solid #dbe8de;border-radius:4px;background:#f5f9f5;color:#557c60;font-size:10px;font-weight:800;font-family:inherit}
+@media(max-width:1199px){.harmonica-card{padding:24px}.harmonica-hero{margin-top:18px}.harmonica-modifiers{grid-template-columns:repeat(4,minmax(0,1fr))}.harmonica-modifiers>button,.harmonica-middle{padding:11px}.harmonica-modifiers small{white-space:normal}.harmonica-keys{gap:7px;padding:12px}.harmonica-key{min-height:166px}.harmonica-hole{border-width:5px}}
+@media(max-width:760px){.harmonica-card{padding:17px}.harmonica-hero{grid-template-columns:70px minmax(0,1fr);gap:10px;padding:18px;min-height:123px}.harmonica-breath{gap:5px}.harmonica-breath span{width:5px}.harmonica-readout strong{font-size:42px}.harmonica-status{grid-column:1/-1;justify-content:center;max-width:none}.harmonica-control-label{margin-top:19px}.harmonica-control-label small{max-width:50%;text-align:right}.harmonica-modifiers{grid-template-columns:repeat(2,minmax(0,1fr))}.harmonica-modifiers>button,.harmonica-middle{min-height:66px}.harmonica-modifiers .harmonica-middle{order:2}.harmonica-modifiers .harmonica-sharp{order:3}.harmonica-modifiers>button:nth-child(3){order:1}.harmonica-keys{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.harmonica-key{min-height:124px;gap:4px}.harmonica-hole{width:34px;border-width:4px}.harmonica-degree{font-size:22px}.harmonica-footer{align-items:stretch;flex-direction:column;gap:14px}.harmonica-footer .volume-control{width:100%;max-width:none}.harmonica-footer p{max-width:none}}
+@media(max-width:420px){.harmonica-keys{gap:5px;padding:7px}.harmonica-key{min-height:112px}.harmonica-hole{width:29px}.harmonica-pitch{font-size:10px}.harmonica-key kbd{height:20px}.harmonica-modifiers>button,.harmonica-middle{padding:9px}.harmonica-mouse-icon{width:29px;height:29px;font-size:16px}.harmonica-modifiers strong{font-size:12px}.harmonica-modifiers small{font-size:9px}}
+@media(max-width:1050px) and (max-height:600px) and (orientation:landscape){.harmonica-hero{min-height:90px;margin:10px 0;padding:12px 18px}.harmonica-control-label{margin:13px 0 7px}.harmonica-modifiers{grid-template-columns:repeat(4,minmax(0,1fr))}.harmonica-keys{grid-template-columns:repeat(8,minmax(0,1fr))}.harmonica-key{min-height:103px}.harmonica-hole{width:28px}}
+

@@ -2,13 +2,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { audioContext, detectPitch, midiToFrequency, playInstrument, playMetronome } from './audio'
 import Scores from './Scores.vue'
+import Harmonica from './Harmonica.vue'
 
 const tabs = [
   { id: 'piano', label: '钢琴', icon: '▥', number: '01' },
   { id: 'guitar', label: '吉他', icon: '♮', number: '02' },
-  { id: 'metronome', label: '节拍器', icon: '◉', number: '03' },
-  { id: 'tuner', label: '调音器', icon: '◌', number: '04' },
-  { id: 'scores', label: '曲谱', icon: '♫', number: '05' },
+  { id: 'harmonica', label: '口琴', icon: '≋', number: '03' },
+  { id: 'metronome', label: '节拍器', icon: '◉', number: '04' },
+  { id: 'tuner', label: '调音器', icon: '◌', number: '05' },
+  { id: 'scores', label: '曲谱', icon: '♫', number: '06' },
 ]
 const noteNames = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B']
 const storageKey = 'tonecraft.settings.v2'
@@ -28,6 +30,7 @@ const savedVolume = value => Number.isFinite(Number(value)) && value !== undefin
   ? Math.min(100, Math.max(0, Math.round(Number(value)))) : 100
 const pianoVolume = ref(savedVolume(saved.pianoVolume))
 const guitarVolume = ref(savedVolume(saved.guitarVolume))
+const harmonicaVolume = ref(savedVolume(saved.harmonicaVolume))
 const metronomeVolume = ref(savedVolume(saved.metronomeVolume))
 function toggleNote(instrument, note) {
   const list = instrument === 'piano' ? pianoVisibleNotes : guitarVisibleNotes
@@ -209,7 +212,7 @@ function tapTempo() {
 }
 watch(beatsPerBar, setMeter)
 watch(beatUnit, () => { if (running.value) { stopMetronome(); toggleMetronome() } })
-watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHints, guitarHints, pianoVolume, guitarVolume, metronomeVolume, bpm, beatsPerBar, beatUnit, voice, accents, metronomePresets], () => {
+watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHints, guitarHints, pianoVolume, guitarVolume, harmonicaVolume, metronomeVolume, bpm, beatsPerBar, beatUnit, voice, accents, metronomePresets], () => {
   try {
     localStorage.setItem(storageKey, JSON.stringify({
       activeTab: activeTab.value,
@@ -220,6 +223,7 @@ watch([activeTab, pianoKeyCount, pianoVisibleNotes, guitarVisibleNotes, pianoHin
       guitarHints: guitarHints.value,
       pianoVolume: pianoVolume.value,
       guitarVolume: guitarVolume.value,
+      harmonicaVolume: harmonicaVolume.value,
       metronomeVolume: metronomeVolume.value,
       bpm: bpm.value,
       beatsPerBar: beatsPerBar.value,
@@ -446,8 +450,9 @@ onBeforeUnmount(() => {
       <header class="mobile-header"><div class="mobile-brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span><strong>TONECRAFT</strong></div><span class="mobile-current">{{ tabs.find(t => t.id === activeTab)?.label }} <small>{{ tabs.find(t => t.id === activeTab)?.number }} / {{ String(tabs.length).padStart(2, '0') }}</small></span></header>
       <header class="topbar"><span>在线音乐工作室 <span class="topbar-divider">/</span> {{ tabs.find(t => t.id === activeTab)?.label }}</span><span class="topbar-right"><span class="status-dot"></span> 音频引擎就绪</span></header>
       <div class="page-content">
-        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> EXPLORE THE SOUND</div><h1>{{ activeTab === 'piano' ? '钢琴模拟器' : activeTab === 'guitar' ? '吉他指板' : activeTab === 'metronome' ? '节拍器' : activeTab === 'tuner' ? '智能调音器' : '曲谱收藏' }}<span class="heading-dot">.</span></h1><p>{{ activeTab === 'piano' ? '从第一个音符开始，感受指尖的旋律。' : activeTab === 'guitar' ? '点击琴弦与品位，探索每一个音。' : activeTab === 'metronome' ? '找到你的节奏，让每一次练习更稳定。' : activeTab === 'tuner' ? '聆听每一个细节，让音准恰到好处。' : '打开一份曲谱，让练习更有方向。' }}</p></div><div class="heading-index">{{ tabs.find(t => t.id === activeTab)?.number }} <span>/ {{ String(tabs.length).padStart(2, '0') }}</span></div></div>
+        <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> EXPLORE THE SOUND</div><h1>{{ activeTab === 'piano' ? '钢琴模拟器' : activeTab === 'guitar' ? '吉他指板' : activeTab === 'harmonica' ? '三角洲口琴' : activeTab === 'metronome' ? '节拍器' : activeTab === 'tuner' ? '智能调音器' : '曲谱收藏' }}<span class="heading-dot">.</span></h1><p>{{ activeTab === 'piano' ? '从第一个音符开始，感受指尖的旋律。' : activeTab === 'guitar' ? '点击琴弦与品位，探索每一个音。' : activeTab === 'harmonica' ? '按住音符吹奏，组合鼠标按键切换音区与半音。' : activeTab === 'metronome' ? '找到你的节奏，让每一次练习更稳定。' : activeTab === 'tuner' ? '聆听每一个细节，让音准恰到好处。' : '打开一份曲谱，让练习更有方向。' }}</p></div><div class="heading-index">{{ tabs.find(t => t.id === activeTab)?.number }} <span>/ {{ String(tabs.length).padStart(2, '0') }}</span></div></div>
 
+        <Harmonica v-if="activeTab === 'harmonica'" v-model:volume="harmonicaVolume" />
         <Scores v-if="activeTab === 'scores'" />
 
         <section v-if="activeTab === 'piano'" class="workspace">
@@ -531,3 +536,4 @@ onBeforeUnmount(() => {
     </main>
   </div>
 </template>
+
