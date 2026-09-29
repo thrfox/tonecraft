@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { createHarmonicaVoice, harmonicaKeys, harmonicaMidi, harmonicaNoteName } from './harmonica'
+import { createHarmonicaVoice, harmonicaKeys, harmonicaMidi, harmonicaNoteName, harmonicaSamplesReady, prepareHarmonicaSamples } from './harmonica'
 import './harmonica.css'
 
 const props = defineProps({ volume: { type: Number, default: 100 } })
@@ -13,6 +13,7 @@ const touchModifiers = new Map()
 const touchState = ref({ low: false, high: false, sharp: false })
 const lastNote = ref(null)
 const playedCount = ref(0)
+const sampleState = ref(harmonicaSamplesReady() ? 'ready' : 'loading')
 
 const low = computed(() => Boolean(mouseButtons.value & 1) || touchState.value.low)
 const high = computed(() => Boolean(mouseButtons.value & 2) || touchState.value.high)
@@ -112,6 +113,7 @@ watch(() => props.volume, value => {
 })
 
 onMounted(() => {
+  prepareHarmonicaSamples().then(() => { sampleState.value = 'ready' }).catch(() => { sampleState.value = 'fallback' })
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('keyup', onKeyUp)
   window.addEventListener('mousedown', onMouseDown)
@@ -145,7 +147,7 @@ onBeforeUnmount(() => {
       <div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 03</div><h2>三角洲口琴</h2></div><span class="pill">C3 — C6 · 8 NOTES</span></div>
       <div class="harmonica-hero">
         <div class="harmonica-breath" :class="{ sounding: heldKeys.length }" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-        <div class="harmonica-readout"><small>当前音高 / NOW PLAYING</small><strong>{{ currentName }}</strong><span>{{ heldKeys.length ? '正在吹奏' : '按住键盘或下方音孔开始吹奏' }}</span></div>
+        <div class="harmonica-readout"><small>当前音高 / NOW PLAYING</small><strong>{{ currentName }}</strong><span>{{ heldKeys.length ? '正在吹奏' : '按住键盘或下方音孔开始吹奏' }} · {{ sampleState === 'ready' ? 'VCSL 真实采样' : sampleState === 'loading' ? '正在加载音色' : '合成音备用' }}</span></div>
         <div class="harmonica-status"><span :class="{ active: low }">低音</span><span :class="{ active: octave === 'middle' }">中音</span><span :class="{ active: high }">高音</span><span :class="{ active: sharp }">♯ 半音</span></div>
       </div>
 
@@ -164,7 +166,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <div class="harmonica-footer"><div class="volume-control"><div class="volume-heading"><span class="volume-symbol" aria-hidden="true">♫</span><label for="harmonica-volume">口琴音量</label><strong>{{ volume }}%</strong></div><input id="harmonica-volume" type="range" min="0" max="100" step="1" :value="volume" :style="{ '--volume-fill': `${volume}%` }" aria-label="口琴音量" @input="emit('update:volume', Number($event.target.value))"></div><p>键盘 <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> <kbd>N</kbd> <kbd>M</kbd> <kbd>,</kbd> 对应 1–7、i。松开鼠标时，按住的音会立即回到中音。</p></div>
+      <div class="harmonica-footer"><div class="volume-control"><div class="volume-heading"><span class="volume-symbol" aria-hidden="true">♫</span><label for="harmonica-volume">口琴音量</label><strong>{{ volume }}%</strong></div><input id="harmonica-volume" type="range" min="0" max="100" step="1" :value="volume" :style="{ '--volume-fill': `${volume}%` }" aria-label="口琴音量" @input="emit('update:volume', Number($event.target.value))"></div><p>键盘 <kbd>Z</kbd> <kbd>X</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>B</kbd> <kbd>N</kbd> <kbd>M</kbd> <kbd>,</kbd> 对应 1–7、i。松开鼠标时，按住的音会立即回到中音。音源：<a href="https://github.com/sgossner/VCSL" target="_blank" rel="noopener noreferrer">VCSL · CC0</a>。</p></div>
     </div>
     <div class="info-grid"><div class="info-card"><span class="info-icon">♫</span><div><small>完整音域</small><strong>C3 — C6</strong></div></div><div class="info-card"><span class="info-icon">◉</span><div><small>当前音区</small><strong>{{ octaveLabel }}{{ sharp ? ' · 升半音' : '' }}</strong></div></div><div class="info-card"><span class="info-icon">▦</span><div><small>累计吹奏</small><strong>{{ playedCount }} <em>次</em></strong></div></div></div>
   </section>

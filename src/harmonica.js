@@ -23,9 +23,114 @@ export function harmonicaNoteName(midi) {
   return `${names[midi % 12]}${Math.floor(midi / 12) - 1}`
 }
 
+const sampleNotes = [
+  ['C3', 48], ['E3', 52], ['C4', 60], ['E4', 64], ['G4', 67],
+  ['C5', 72], ['E5', 76], ['G5', 79], ['C6', 84],
+]
+let samples = null
+let sampleLoad = null
+
+export function harmonicaSamplesReady() { return samples !== null }
+
+export function prepareHarmonicaSamples() {
+  if (samples) return Promise.resolve()
+  if (sampleLoad) return sampleLoad
+  const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext
+  if (!OfflineContext) return Promise.reject(new Error('Offline audio decoding is unavailable'))
+  let decoder
+  try { decoder = new OfflineContext(1, 44100, 44100) }
+  catch (error) { return Promise.reject(error) }
+  sampleLoad = Promise.all(sampleNotes.map(async ([name, midi]) => {
+    const response = await fetch(`${import.meta.env.BASE_URL}audio/harmonica/${name}.mp3`)
+    if (!response.ok) throw new Error(`Could not load ${name}: ${response.status}`)
+    const buffer = await decoder.decodeAudioData(await response.arrayBuffer())
+    const rate = buffer.sampleRate
+    const data = buffer.getChannelData(0)
+    const start = Math.round(0.9 * rate)
+    const end = Math.min(Math.round(3.5 * rate), data.length - Math.round(0.15 * rate))
+    const fadeLength = Math.round(0.07 * rate)
+    // Blend the end of the sustain into an earlier section. The first pass
+    // keeps the recorded attack; subsequent passes loop without a hard click.
+    for (let i = 0; i < fadeLength; i++) {
+      const blend = (i + 1) / fadeLength
+      data[end - fadeLength + i] = data[end - fadeLength + i] * (1 - blend) + data[start + i] * blend
+    }
+    return { name, midi, buffer, loopStart: (start + fadeLength) / rate, loopEnd: end / rate }
+  })).then(loaded => { samples = loaded }).catch(error => {
+    sampleLoad = null
+    throw error
+  })
+  return sampleLoad
+}
+
+function closestSample(midi) {
+  return samples.reduce((closest, sample) => Math.abs(sample.midi - midi) < Math.abs(closest.midi - midi) ? sample : closest)
+}
+
+function createSampleHarmonicaVoice(midi, volume) {
+  const ctx = audioContext()
+  const began = ctx.currentTime
+  const output = ctx.createGain()
+  const breath = ctx.createGain()
+  output.gain.value = Math.max(0, Math.min(100, volume)) / 100 * 0.5
+  breath.gain.setValueAtTime(0, began)
+  breath.gain.linearRampToValueAtTime(1, began + 0.5)
+  breath.connect(output).connect(ctx.destination)
+  let released = false
+  let current
+
+  function playSample(nextMidi) {
+    const at = ctx.currentTime
+    const sample = closestSample(nextMidi)
+    if (current?.sample === sample) {
+      current.source.playbackRate.setTargetAtTime(2 ** ((nextMidi - sample.midi) / 12), at, 0.009)
+      return
+    }
+    const source = ctx.createBufferSource()
+    const crossfade = ctx.createGain()
+    source.buffer = sample.buffer
+    source.loop = true
+    source.loopStart = sample.loopStart
+    source.loopEnd = sample.loopEnd
+    source.playbackRate.value = 2 ** ((nextMidi - sample.midi) / 12)
+    crossfade.gain.setValueAtTime(current ? 0 : 1, at)
+    source.connect(crossfade).connect(breath)
+    source.onended = () => { source.disconnect(); crossfade.disconnect() }
+    source.start(at)
+    if (current) {
+      crossfade.gain.linearRampToValueAtTime(1, at + 0.035)
+      current.gain.gain.cancelScheduledValues(at)
+      current.gain.gain.setValueAtTime(1, at)
+      current.gain.gain.linearRampToValueAtTime(0, at + 0.035)
+      current.source.stop(at + 0.05)
+    }
+    current = { sample, source, gain: crossfade }
+  }
+
+  playSample(midi)
+  return {
+    setPitch(nextMidi) { if (!released) playSample(nextMidi) },
+    setVolume(nextVolume) {
+      if (released) return
+      output.gain.setTargetAtTime(Math.max(0, Math.min(100, nextVolume)) / 100 * 0.5, ctx.currentTime, 0.02)
+    },
+    release() {
+      if (released) return
+      released = true
+      const at = ctx.currentTime
+      const currentBreath = Math.min(1, Math.max(0, (at - began) / 0.5))
+      breath.gain.cancelScheduledValues(at)
+      breath.gain.setValueAtTime(currentBreath, at)
+      breath.gain.linearRampToValueAtTime(0, at + 0.5)
+      current.source.stop(at + 0.53)
+      setTimeout(() => { breath.disconnect(); output.disconnect() }, 650)
+    },
+  }
+}
+
 // One voice stays alive while a key is held. Changing mouse modifiers bends its pitch
 // without restarting the breath; attack and release each take half a second.
-export function createHarmonicaVoice(midi, volume = 100) {
+function createSynthHarmonicaVoice(midi, volume = 100) {
   const ctx = audioContext()
   const now = ctx.currentTime
   const output = ctx.createGain()
@@ -103,5 +208,9 @@ export function createHarmonicaVoice(midi, volume = 100) {
       }, 650)
     },
   }
+}
+
+export function createHarmonicaVoice(midi, volume = 100) {
+  return samples ? createSampleHarmonicaVoice(midi, volume) : createSynthHarmonicaVoice(midi, volume)
 }
 
