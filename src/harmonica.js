@@ -96,7 +96,9 @@ function createSampleHarmonicaVoice(midi, volume) {
     crossfade.gain.setValueAtTime(current ? 0 : 1, at)
     source.connect(crossfade).connect(breath)
     source.onended = () => { source.disconnect(); crossfade.disconnect() }
-    source.start(at)
+    // A newly pressed note keeps its natural recorded attack. When a mouse
+    // modifier changes a held note, start in the sustain for an immediate retune.
+    source.start(at, current ? sample.loopStart : 0)
     if (current) {
       crossfade.gain.linearRampToValueAtTime(1, at + 0.035)
       current.gain.gain.cancelScheduledValues(at)
