@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { createHarmonicaVoice, harmonicaKeys, harmonicaMidi, harmonicaNoteName, harmonicaSamplesReady, prepareHarmonicaSamples } from './harmonica'
+import HarmonicaScore from './HarmonicaScore.vue'
 import './harmonica.css'
 
 const props = defineProps({ volume: { type: Number, default: 100 } })
@@ -143,6 +144,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="harmonica-workspace workspace" aria-label="三角洲口琴模拟器">
+    <HarmonicaScore />
     <div class="card harmonica-card">
       <div class="card-title-row"><div><div class="section-kicker">INSTRUMENT 03</div><h2>三角洲口琴</h2></div><span class="pill">C3 — C6 · 8 NOTES</span></div>
       <div class="harmonica-hero">

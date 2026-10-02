@@ -1,4 +1,73 @@
 .harmonica-workspace{display:grid;gap:17px}
+.harmonica-score{min-width:0;padding:20px 24px}
+.harmonica-score-heading,.harmonica-score-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.harmonica-score-heading h2{margin-top:5px}
+.harmonica-score-caption{color:#88a08e;font-size:11px;font-weight:700}
+.harmonica-score-toolbar{display:flex;align-items:center;gap:10px;margin:15px 0 12px}
+.harmonica-score-toolbar>label{flex:none;color:#62816b;font-size:11px;font-weight:800}
+.harmonica-score-toolbar select,.harmonica-score-search input{min-width:0;height:39px;padding:0 11px;border:1px solid #dce8df;border-radius:9px;background:#f8fbf8;color:#31533d;font-size:12px}
+.harmonica-score-toolbar select{flex:1}
+.harmonica-score-search{display:flex;gap:6px;min-width:0}
+.harmonica-score-search-toggle{display:none;border:1px solid #cfe2d3;border-radius:9px;background:#edf6ef;color:#417850;font-size:11px;font-weight:800;padding:0 11px;height:39px}
+.harmonica-score-search input{width:155px}
+.harmonica-score-search button{border:1px solid #cfe2d3;border-radius:9px;background:#edf6ef;color:#417850;font-size:11px;font-weight:800;padding:0 11px}
+.harmonica-score-search button:hover{background:#dceee1}
+.harmonica-score-viewer{position:relative;display:grid;place-items:center;height:clamp(260px,40dvh,540px);overflow:hidden;border:1px solid #e4eae5;border-radius:12px;background:#f5f7f5}
+.harmonica-score-image-scroll{position:absolute;inset:0;overflow:hidden}
+.harmonica-score-image-scroll>img{display:block;width:100%;height:100%;object-fit:contain;cursor:zoom-in}
+.harmonica-score-image-scroll.is-reading{overflow:auto}
+.harmonica-score-image-scroll.is-reading>img{width:min(100%,760px);height:auto;margin:0 auto;cursor:zoom-out}
+.harmonica-score-viewer>iframe{width:100%;height:100%;border:0;background:#fff}
+.harmonica-score-musicxml{width:100%;height:100%;overflow:auto;padding:12px;background:white}
+.harmonica-score-musicxml>div{min-width:400px}
+.harmonica-score-view-actions{position:absolute;z-index:1;right:10px;bottom:10px;display:flex;gap:5px}
+.harmonica-score-view-actions button{padding:8px 12px;border:0;border-radius:8px;background:#153e2edb;color:white;font-size:11px;font-weight:800}
+.harmonica-score-bottom{margin-top:10px;color:#819686;font-size:11px;min-width:0}
+.harmonica-score-bottom>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.harmonica-score-bottom a{flex:none;color:#438157;font-weight:800;text-decoration:none}
+.harmonica-score-empty{display:grid;place-items:center;height:160px;border:1px dashed #d5e3d8;border-radius:12px;background:#f7faf7;color:#8ba091;font-size:12px;text-align:center;padding:16px}
+.harmonica-score-lightbox{position:fixed;inset:0;z-index:110;display:grid;place-items:center;background:#102018ed;padding:50px 12px 12px}
+.harmonica-score-lightbox>img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-out}
+.harmonica-score-lightbox>button{position:absolute;top:10px;right:14px;width:36px;height:36px;border:0;border-radius:9px;background:#ffffff30;color:white;font-size:26px}
+.practice-page{padding-top:16px}
+.practice-page>.page-heading{display:none}
+.practice-page .harmonica-workspace{gap:10px}
+.practice-page .harmonica-score{padding:14px 18px}
+.practice-page .harmonica-score-viewer{height:clamp(170px,30dvh,330px)}
+.practice-page .harmonica-card{padding:12px 18px;overflow:visible}
+.practice-page .harmonica-card>.card-title-row,.practice-page .harmonica-card~.info-grid{display:none}
+.practice-page .harmonica-hero{min-height:0;margin:0 0 8px;padding:8px 14px;grid-template-columns:50px minmax(0,1fr) auto}
+.practice-page .harmonica-breath{height:37px;gap:4px}
+.practice-page .harmonica-breath span{width:4px;max-height:36px}
+.practice-page .harmonica-readout strong{font-size:28px}
+.practice-page .harmonica-readout>span{display:none}
+.practice-page .harmonica-control-label{margin:8px 0 5px}
+.practice-page .harmonica-modifiers>button,.practice-page .harmonica-middle{min-height:46px;padding:6px 10px}
+.practice-page .harmonica-mouse-icon{width:27px;height:27px;font-size:15px}
+.practice-page .harmonica-keys{padding:6px;gap:5px}
+.practice-page .harmonica-key{min-height:92px;gap:3px;padding:5px 2px}
+.practice-page .harmonica-hole{width:28px;border-width:3px}
+.practice-page .harmonica-degree{font-size:20px}
+.practice-page .harmonica-key kbd{display:none}
+.practice-page .harmonica-footer{margin-top:8px}
+.practice-page .harmonica-footer p{display:none}
+.practice-page .harmonica-footer .volume-control{width:100%}
+@media(min-width:700px){
+  .practice-page .harmonica-score{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:7px 16px}
+  .practice-page .harmonica-score-toolbar{grid-column:2;margin:0}
+  .practice-page .harmonica-score-viewer,.practice-page .harmonica-score-empty,.practice-page .harmonica-score-bottom,.practice-page .harmonica-score>.score-error{grid-column:1/-1}
+  .practice-page .harmonica-score-viewer{height:clamp(150px,25dvh,280px)}
+  .practice-page .harmonica-card{display:grid;grid-template-columns:minmax(190px,240px) minmax(0,1fr);gap:5px 14px}
+  .practice-page .harmonica-hero{grid-column:1/-1}
+  .practice-page .harmonica-card>.harmonica-control-label:nth-child(3){grid-column:1;grid-row:2}
+  .practice-page .harmonica-modifiers{grid-column:1;grid-row:3;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+  .practice-page .harmonica-modifiers>button,.practice-page .harmonica-middle{min-height:43px;padding:4px 6px}
+  .practice-page .harmonica-modifiers small,.practice-page .harmonica-mouse-icon{display:none}
+  .practice-page .harmonica-card>.harmonica-control-label:nth-child(5){grid-column:2;grid-row:2}
+  .practice-page .harmonica-keys{grid-column:2;grid-row:3}
+  .practice-page .harmonica-footer{grid-column:1/-1}
+}
+@media(min-width:700px) and (max-width:1050px){.practice-page .harmonica-score{display:block}.practice-page .harmonica-score-toolbar{margin:10px 0}}
 .harmonica-card{padding:29px 32px;overflow:hidden}
 .harmonica-hero{display:grid;grid-template-columns:120px minmax(0,1fr) auto;align-items:center;gap:25px;min-height:154px;margin:24px 0 26px;padding:26px 32px;border-radius:16px;background:radial-gradient(circle at 17% 50%,#3c8058 0%,#1e4532 43%,#122d26 100%);color:#fff}
 .harmonica-breath{display:flex;align-items:center;justify-content:center;gap:8px;height:76px}
@@ -41,6 +110,9 @@
 .harmonica-footer kbd{padding:2px 4px;border:1px solid #dbe8de;border-radius:4px;background:#f5f9f5;color:#557c60;font-size:10px;font-weight:800;font-family:inherit}
 @media(max-width:1199px){.harmonica-card{padding:24px}.harmonica-hero{margin-top:18px}.harmonica-modifiers{grid-template-columns:repeat(4,minmax(0,1fr))}.harmonica-modifiers>button,.harmonica-middle{padding:11px}.harmonica-modifiers small{white-space:normal}.harmonica-keys{gap:7px;padding:12px}.harmonica-key{min-height:166px}.harmonica-hole{border-width:5px}}
 @media(max-width:760px){.harmonica-card{padding:17px}.harmonica-hero{grid-template-columns:70px minmax(0,1fr);gap:10px;padding:18px;min-height:123px}.harmonica-breath{gap:5px}.harmonica-breath span{width:5px}.harmonica-readout strong{font-size:42px}.harmonica-status{grid-column:1/-1;justify-content:center;max-width:none}.harmonica-control-label{margin-top:19px}.harmonica-control-label small{max-width:50%;text-align:right}.harmonica-modifiers{grid-template-columns:repeat(2,minmax(0,1fr))}.harmonica-modifiers>button,.harmonica-middle{min-height:66px}.harmonica-modifiers .harmonica-middle{order:2}.harmonica-modifiers .harmonica-sharp{order:3}.harmonica-modifiers>button:nth-child(3){order:1}.harmonica-keys{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.harmonica-key{min-height:124px;gap:4px}.harmonica-hole{width:34px;border-width:4px}.harmonica-degree{font-size:22px}.harmonica-footer{align-items:stretch;flex-direction:column;gap:14px}.harmonica-footer .volume-control{width:100%;max-width:none}.harmonica-footer p{max-width:none}}
+@media(max-width:760px){.harmonica-score{padding:14px}.harmonica-score-toolbar{flex-wrap:wrap}.harmonica-score-toolbar select{flex:1 1 calc(100% - 80px)}.harmonica-score-search{width:100%}.harmonica-score-search input{flex:1;width:auto}.harmonica-score-viewer{height:clamp(220px,34dvh,360px)}.harmonica-score-caption{font-size:10px}}
+@media(max-width:699px){.harmonica-workspace{gap:9px}.harmonica-card{padding:12px;overflow:visible}.harmonica-card .card-title-row,.harmonica-card .harmonica-breath,.harmonica-card .harmonica-footer p,.harmonica-card~.info-grid{display:none}.harmonica-hero{display:flex;min-height:0;margin:0 0 8px;padding:9px 12px;gap:10px}.harmonica-readout{display:flex;align-items:center;gap:8px}.harmonica-readout small,.harmonica-readout>span{display:none}.harmonica-readout strong{font-size:24px;min-width:42px}.harmonica-status{margin-left:auto;gap:3px}.harmonica-status span{padding:4px 6px;font-size:9px}.harmonica-control-label{margin:8px 0 5px}.harmonica-control-label small{display:none}.harmonica-modifiers{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}.harmonica-modifiers>button,.harmonica-middle{display:flex;align-items:center;justify-content:center;gap:3px;min-height:43px;padding:4px;text-align:center}.harmonica-modifiers .harmonica-middle{order:0}.harmonica-modifiers>button:nth-child(3){order:0}.harmonica-modifiers .harmonica-sharp{order:0}.harmonica-modifiers small,.harmonica-mouse-icon{display:none}.harmonica-modifiers strong{font-size:11px}.harmonica-keys{gap:4px;padding:5px}.harmonica-key{min-height:80px;padding:4px 1px;gap:2px}.harmonica-hole{width:23px;border-width:3px}.harmonica-degree{font-size:18px}.harmonica-pitch{font-size:10px}.harmonica-key kbd{display:none}.harmonica-footer{margin-top:8px}.harmonica-footer .volume-control{width:100%}.harmonica-score-viewer{height:clamp(180px,29dvh,310px)}}
+@media(max-width:699px){.practice-page .harmonica-score{padding:10px}.practice-page .harmonica-score-heading h2{font-size:16px}.practice-page .harmonica-score-caption{display:none}.practice-page .harmonica-score-toolbar{margin:7px 0}.practice-page .harmonica-score-toolbar select{flex:1 1 auto}.practice-page .harmonica-score-search-toggle{display:block}.practice-page .harmonica-score-search{display:none}.practice-page .harmonica-score-search.is-open{display:flex}.practice-page .harmonica-score-viewer{height:clamp(155px,20dvh,210px)}.practice-page .harmonica-key{min-height:66px}.practice-page .harmonica-score-bottom{margin-top:5px}}
 @media(max-width:420px){.harmonica-keys{gap:5px;padding:7px}.harmonica-key{min-height:112px}.harmonica-hole{width:29px}.harmonica-pitch{font-size:10px}.harmonica-key kbd{height:20px}.harmonica-modifiers>button,.harmonica-middle{padding:9px}.harmonica-mouse-icon{width:29px;height:29px;font-size:16px}.harmonica-modifiers strong{font-size:12px}.harmonica-modifiers small{font-size:9px}}
 @media(max-width:1050px) and (max-height:600px) and (orientation:landscape){.harmonica-hero{min-height:90px;margin:10px 0;padding:12px 18px}.harmonica-control-label{margin:13px 0 7px}.harmonica-modifiers{grid-template-columns:repeat(4,minmax(0,1fr))}.harmonica-keys{grid-template-columns:repeat(8,minmax(0,1fr))}.harmonica-key{min-height:103px}.harmonica-hole{width:28px}}
 

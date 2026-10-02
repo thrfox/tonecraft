@@ -449,7 +449,7 @@ onBeforeUnmount(() => {
     <main class="main-content">
       <header class="mobile-header"><div class="mobile-brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span><strong>TONECRAFT</strong></div><span class="mobile-current">{{ tabs.find(t => t.id === activeTab)?.label }} <small>{{ tabs.find(t => t.id === activeTab)?.number }} / {{ String(tabs.length).padStart(2, '0') }}</small></span></header>
       <header class="topbar"><span>在线音乐工作室 <span class="topbar-divider">/</span> {{ tabs.find(t => t.id === activeTab)?.label }}</span><span class="topbar-right"><span class="status-dot"></span> 音频引擎就绪</span></header>
-      <div class="page-content">
+      <div class="page-content" :class="{ 'practice-page': activeTab === 'harmonica' }">
         <div class="page-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> EXPLORE THE SOUND</div><h1>{{ activeTab === 'piano' ? '钢琴模拟器' : activeTab === 'guitar' ? '吉他指板' : activeTab === 'harmonica' ? '三角洲口琴' : activeTab === 'metronome' ? '节拍器' : activeTab === 'tuner' ? '智能调音器' : '曲谱收藏' }}<span class="heading-dot">.</span></h1><p>{{ activeTab === 'piano' ? '从第一个音符开始，感受指尖的旋律。' : activeTab === 'guitar' ? '点击琴弦与品位，探索每一个音。' : activeTab === 'harmonica' ? '按住音符吹奏，组合鼠标按键切换音区与半音。' : activeTab === 'metronome' ? '找到你的节奏，让每一次练习更稳定。' : activeTab === 'tuner' ? '聆听每一个细节，让音准恰到好处。' : '打开一份曲谱，让练习更有方向。' }}</p></div><div class="heading-index">{{ tabs.find(t => t.id === activeTab)?.number }} <span>/ {{ String(tabs.length).padStart(2, '0') }}</span></div></div>
 
         <Harmonica v-if="activeTab === 'harmonica'" v-model:volume="harmonicaVolume" />

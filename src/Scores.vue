@@ -4,6 +4,15 @@ import { compressScoreImage } from './imageCompression'
 import { scoreBucket, supabase } from './supabase'
 
 const scores = ref([])
+const pageSize = 10
+const currentPage = ref(1)
+const scoreTotal = ref(0)
+const totalPages = computed(() => Math.max(1, Math.ceil(scoreTotal.value / pageSize)))
+const pageNumbers = computed(() => {
+  const start = Math.max(1, Math.min(currentPage.value - 2, totalPages.value - 4))
+  return Array.from({ length: Math.min(5, totalPages.value - start + 1) }, (_, index) => start + index)
+})
+let listRequest = 0
 const loading = ref(false)
 const listError = ref('')
 const user = ref(null)
@@ -62,12 +71,28 @@ const dateLabel = date => new Intl.DateTimeFormat('zh-CN', { year: 'numeric', mo
 
 async function loadScores() {
   if (!supabase) return
+  const request = ++listRequest
   loading.value = true
   listError.value = ''
-  const { data, error } = await supabase.from('scores').select('id,title,composer,storage_path,file_type,created_at').order('created_at', { ascending: false })
+  const from = (currentPage.value - 1) * pageSize
+  const { data, error, count } = await supabase.from('scores')
+    .select('id,title,composer,storage_path,file_type,created_at', { count: 'exact' })
+    .order('created_at', { ascending: false }).order('id', { ascending: false })
+    .range(from, from + pageSize - 1)
+  if (request !== listRequest) return
   if (error) listError.value = '曲谱暂时无法加载，请稍后刷新重试。'
-  else scores.value = data || []
+  else {
+    scoreTotal.value = count ?? 0
+    if (currentPage.value > totalPages.value) { currentPage.value = totalPages.value; return loadScores() }
+    scores.value = data || []
+  }
   loading.value = false
+}
+
+function goToPage(page) {
+  if (page < 1 || page > totalPages.value || page === currentPage.value) return
+  currentPage.value = page
+  loadScores()
 }
 
 async function refreshIdentity() {
@@ -184,6 +209,7 @@ async function uploadScore() {
     file.value = null
     const input = document.getElementById('score-file')
     if (input) input.value = ''
+    currentPage.value = 1
     await loadScores()
   } catch (error) {
     uploadError.value = `文件处理或上传失败：${error?.message || '请重试。'}`
@@ -331,7 +357,7 @@ onBeforeUnmount(() => {
   <section class="scores-workspace">
     <div class="card score-intro">
       <div><div class="section-kicker">SHEET MUSIC LIBRARY</div><h2>曲谱收藏</h2><p>挑一首曲子，边看谱边练习。支持图片、PDF 和 MusicXML 曲谱。</p></div>
-      <span class="score-count">{{ scores.length }} <small>份曲谱</small></span>
+      <span class="score-count">{{ scoreTotal }} <small>份曲谱</small></span>
     </div>
 
     <div v-if="!supabase" class="card score-state">曲谱库正在配置，完成后就能在这里浏览曲谱。</div>
@@ -345,6 +371,15 @@ onBeforeUnmount(() => {
           <div class="score-card-body"><span class="section-kicker">{{ row.file_type.toUpperCase() }} · {{ dateLabel(row.created_at) }}</span><h3>{{ row.title }}</h3><p>{{ row.composer || '曲谱收藏' }}</p><div class="score-card-actions"><button class="primary-button" type="button" @click="selected = row">预览曲谱</button><button v-if="isAdmin" class="score-delete" type="button" :aria-label="`删除 ${row.title}`" @click="deleteScore(row)">删除</button></div></div>
         </article>
       </div>
+
+      <nav v-if="scoreTotal > pageSize" class="score-pagination" aria-label="曲谱分页">
+        <span>第 {{ (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, scoreTotal) }} 条，共 {{ scoreTotal }} 条</span>
+        <div>
+          <button type="button" :disabled="currentPage === 1 || loading" @click="goToPage(currentPage - 1)">上一页</button>
+          <button v-for="page in pageNumbers" :key="page" type="button" :class="{ active: page === currentPage }" :aria-label="`第 ${page} 页`" :aria-current="page === currentPage ? 'page' : undefined" :disabled="loading" @click="goToPage(page)">{{ page }}</button>
+          <button type="button" :disabled="currentPage === totalPages || loading" @click="goToPage(currentPage + 1)">下一页</button>
+        </div>
+      </nav>
 
       <div class="card score-admin">
         <template v-if="isAdmin">
